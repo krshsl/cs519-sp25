@@ -1,0 +1,32 @@
+--- ../project1/linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl.orig	2025-02-14 17:18:49.812063838 -0500
++++ ../project1/linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-02-14 17:19:46.420003393 -0500
+@@ -415,3 +415,5 @@
+ 547	x32	pwritev2		compat_sys_pwritev64v2
+ # This is the end of the legacy x32 range.  Numbers 548 and above are
+ # not special and are not to be used for x32-specific syscalls.
++
++548 common  app_helper  sys_app_helper
+\ No newline at end of file
+--- ../project1/linux-5.15.0/include/linux/syscalls.h.orig	2025-02-14 17:46:34.610280766 -0500
++++ ../project1/linux-5.15.0/include/linux/syscalls.h	2025-02-14 17:54:02.961551255 -0500
+@@ -1272,7 +1272,7 @@
+ 			unsigned long fd, unsigned long pgoff);
+ asmlinkage long sys_old_mmap(struct mmap_arg_struct __user *arg);
+ 
+-
++asmlinkage long sys_app_helper(void);
+ /*
+  * Not a real system call, but a placeholder for syscalls which are
+  * not implemented -- see kernel/sys_ni.c
+--- ../project1/linux-5.15.0/mm/mmap.c.orig	2025-02-14 17:53:07.761639651 -0500
++++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-14 18:01:57.084807547 -0500
+@@ -3832,3 +3832,8 @@
+ 	return 0;
+ }
+ subsys_initcall(init_reserve_notifier);
++
++asmlinkage long sys_app_helper(void) {
++	printk(KERN_EMERG "Hello World from kernel!\n");
++	return 0;
++}
+\ No newline at end of file
