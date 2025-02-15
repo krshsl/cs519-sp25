@@ -1,31 +1,47 @@
 --- ../project1/linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl.orig	2025-02-14 17:18:49.812063838 -0500
-+++ ../project1/linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-02-14 17:19:46.420003393 -0500
-@@ -415,3 +415,5 @@
++++ ../project1/linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-02-15 13:45:17.625359055 -0500
+@@ -343,6 +343,7 @@
+ 332	common	statx			sys_statx
+ 333	common	io_pgetevents		sys_io_pgetevents
+ 334	common	rseq			sys_rseq
++335 common  app_helper  sys_app_helper
+ # don't use numbers 387 through 423, add new calls after the last
+ # 'common' entry
+ 424	common	pidfd_send_signal	sys_pidfd_send_signal
+@@ -414,4 +415,4 @@
+ 546	x32	preadv2			compat_sys_preadv64v2
  547	x32	pwritev2		compat_sys_pwritev64v2
  # This is the end of the legacy x32 range.  Numbers 548 and above are
- # not special and are not to be used for x32-specific syscalls.
-+
-+548 common  app_helper  sys_app_helper
+-# not special and are not to be used for x32-specific syscalls.
++# not special and are not to be used for x32-specific syscalls.
 \ No newline at end of file
 --- ../project1/linux-5.15.0/include/linux/syscalls.h.orig	2025-02-14 17:46:34.610280766 -0500
-+++ ../project1/linux-5.15.0/include/linux/syscalls.h	2025-02-14 17:54:02.961551255 -0500
-@@ -1272,7 +1272,7 @@
++++ ../project1/linux-5.15.0/include/linux/syscalls.h	2025-02-15 13:48:10.453048823 -0500
+@@ -1271,14 +1271,14 @@
+ 			unsigned long prot, unsigned long flags,
  			unsigned long fd, unsigned long pgoff);
  asmlinkage long sys_old_mmap(struct mmap_arg_struct __user *arg);
- 
 -
-+asmlinkage long sys_app_helper(void);
+-
  /*
   * Not a real system call, but a placeholder for syscalls which are
   * not implemented -- see kernel/sys_ni.c
+  */
+ asmlinkage long sys_ni_syscall(void);
+ 
++/* mm/mmap.c */
++asmlinkage long sys_app_helper(void);
+ #endif /* CONFIG_ARCH_HAS_SYSCALL_WRAPPER */
+ 
+ 
 --- ../project1/linux-5.15.0/mm/mmap.c.orig	2025-02-14 17:53:07.761639651 -0500
-+++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-14 18:01:57.084807547 -0500
++++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-15 13:04:47.226003299 -0500
 @@ -3832,3 +3832,8 @@
  	return 0;
  }
  subsys_initcall(init_reserve_notifier);
 +
-+asmlinkage long sys_app_helper(void) {
++SYSCALL_DEFINE0(sys_app_helper) {
 +	printk(KERN_EMERG "Hello World from kernel!\n");
 +	return 0;
 +}
