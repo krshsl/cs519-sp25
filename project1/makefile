@@ -1,4 +1,4 @@
-all: clean compile
+all: compile
 
 compile: 
 	gcc test.c -o test.o

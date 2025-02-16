@@ -16,7 +16,7 @@
 +# not special and are not to be used for x32-specific syscalls.
 \ No newline at end of file
 --- ../project1/linux-5.15.0/include/linux/syscalls.h.orig	2025-02-14 17:46:34.610280766 -0500
-+++ ../project1/linux-5.15.0/include/linux/syscalls.h	2025-02-15 13:48:10.453048823 -0500
++++ ../project1/linux-5.15.0/include/linux/syscalls.h	2025-02-15 19:46:42.559613757 -0500
 @@ -1271,14 +1271,14 @@
  			unsigned long prot, unsigned long flags,
  			unsigned long fd, unsigned long pgoff);
@@ -30,19 +30,21 @@
  asmlinkage long sys_ni_syscall(void);
  
 +/* mm/mmap.c */
-+asmlinkage long sys_app_helper(void);
++asmlinkage long sys_app_helper(char __user *buf, size_t len);
  #endif /* CONFIG_ARCH_HAS_SYSCALL_WRAPPER */
  
  
 --- ../project1/linux-5.15.0/mm/mmap.c.orig	2025-02-14 17:53:07.761639651 -0500
-+++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-15 13:04:47.226003299 -0500
-@@ -3832,3 +3832,8 @@
++++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-15 19:51:05.371187542 -0500
+@@ -3832,3 +3832,10 @@
  	return 0;
  }
  subsys_initcall(init_reserve_notifier);
 +
-+SYSCALL_DEFINE0(sys_app_helper) {
-+	printk(KERN_EMERG "Hello World from kernel!\n");
++SYSCALL_DEFINE2(app_helper, char __user *, buf, size_t, len) {
++	printk(KERN_EMERG "before::%s::%d\n", buf, len);
++	memset(buf, 1, len);
++	printk(KERN_EMERG "after::%s::%d\n", buf, len);
 +	return 0;
 +}
 \ No newline at end of file
