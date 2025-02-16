@@ -1,0 +1,163 @@
+Data Type,Size,Iterations,Success Rate,Failure Rate,Avg Time Taken(microseconds)
+Running test for char and size 256,256Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.735618 microseconds
+Running test for char and size 512,512Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.728669 microseconds
+Running test for char and size 1024,1024Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.664751 microseconds
+Running test for char and size 2048,2048Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 1.137401 microseconds
+Running test for char and size 4096,4096Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.932499 microseconds
+Running test for char and size 8192,8192Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 1.144807 microseconds
+Running test for char and size 16384,16384Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 2.076397 microseconds
+Running test for char and size 32768,32768Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 6.619361 microseconds
+Running test for char and size 65536,65536Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 10.914295 microseconds
+Running test for int and size 256,256Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 1.092785 microseconds
+Running test for int and size 512,512Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.771846 microseconds
+Running test for int and size 1024,1024Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.661566 microseconds
+Running test for int and size 2048,2048Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 1.182159 microseconds
+Running test for int and size 4096,4096Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.927845 microseconds
+Running test for int and size 8192,8192Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 1.298672 microseconds
+Running test for int and size 16384,16384Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 2.719500 microseconds
+Running test for int and size 32768,32768Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 5.486570 microseconds
+Running test for int and size 65536,65536Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 10.333366 microseconds
+Running test for unsigned int and size 256,256Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.760022 microseconds
+Running test for unsigned int and size 512,512Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.764545 microseconds
+Running test for unsigned int and size 1024,1024Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.780947 microseconds
+Running test for unsigned int and size 2048,2048Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.829079 microseconds
+Running test for unsigned int and size 4096,4096Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.924995 microseconds
+Running test for unsigned int and size 8192,8192Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.951492 microseconds
+Running test for unsigned int and size 16384,16384Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 2.582859 microseconds
+Running test for unsigned int and size 32768,32768Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 5.729163 microseconds
+Running test for unsigned int and size 65536,65536Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 10.425130 microseconds
+Running test for unsigned char and size 256,256Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.636465 microseconds
+Running test for unsigned char and size 512,512Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.654804 microseconds
+Running test for unsigned char and size 1024,1024Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.630196 microseconds
+Running test for unsigned char and size 2048,2048Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.657272 microseconds
+Running test for unsigned char and size 4096,4096Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.740032 microseconds
+Running test for unsigned char and size 8192,8192Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.912315 microseconds
+Running test for unsigned char and size 16384,16384Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 2.046070 microseconds
+Running test for unsigned char and size 32768,32768Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 5.497542 microseconds
+Running test for unsigned char and size 65536,65536Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 10.593716 microseconds
+Running test for long and size 256,256Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.631733 microseconds
+Running test for long and size 512,512Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.713274 microseconds
+Running test for long and size 1024,1024Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.779083 microseconds
+Running test for long and size 2048,2048Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.826276 microseconds
+Running test for long and size 4096,4096Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.931850 microseconds
+Running test for long and size 8192,8192Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.938059 microseconds
+Running test for long and size 16384,16384Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 2.287104 microseconds
+Running test for long and size 32768,32768Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 5.491249 microseconds
+Running test for long and size 65536,65536Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 10.203261 microseconds
+Running test for unsigned long and size 256,256Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.597412 microseconds
+Running test for unsigned long and size 512,512Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.608511 microseconds
+Running test for unsigned long and size 1024,1024Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.621134 microseconds
+Running test for unsigned long and size 2048,2048Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.657256 microseconds
+Running test for unsigned long and size 4096,4096Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.740547 microseconds
+Running test for unsigned long and size 8192,8192Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 0.909705 microseconds
+Running test for unsigned long and size 16384,16384Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 2.042392 microseconds
+Running test for unsigned long and size 32768,32768Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 5.487511 microseconds
+Running test for unsigned long and size 65536,65536Total Iters: 1000000, Success Iters: 1000000, Failure Iters: 0
+Success Rate: 1.000000, Failure Rate: 0.000000
+Average Time taken: 10.394122 microseconds

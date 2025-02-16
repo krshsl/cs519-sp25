@@ -7,7 +7,7 @@
 
 #define SYS_APP_HELPER 335
 #define DATA_TYPE char
-#define DATA_SIZE 256*sizeof(DATA_TYPE)
+#define DATA_SIZE 1024*sizeof(DATA_TYPE)
 #define ITERS 1000000
 
 #include <stdio.h>
@@ -19,7 +19,7 @@ long long current_timestamp_micros() {
     return (long long)tv.tv_sec * 1000000LL + tv.tv_usec;
 }
 
-int testcall() {
+int testcall(int argc, char *argv[]) {
     long long start_time, end_time;
     long double averageTime = 0;
     long success, failure, iter;
@@ -51,13 +51,18 @@ int testcall() {
         free(check);
     }
 
-    printf("Total Iters: %ld, Success Iters: %ld, Failure Iters: %ld\n", iter, success, failure);
-    printf("Success Rate: %f, Failure Rate: %f\n", (double)success/iter, (double)failure/iter);
-    printf("Average Time taken: %Lf microseconds\n", averageTime/iter);
+    if (argc > 1 && strcmp(argv[1], "csv") == 0) {
+        printf("%ld,%Lf,%Lf,", iter, (double)success/iter, (double)failure/iter);
+        printf("%Lf\n", averageTime/iter);
+    } else {
+        printf("Total Iters: %ld, Success Iters: %ld, Failure Iters: %ld\n", iter, success, failure);
+        printf("Success Rate: %f, Failure Rate: %f\n", (double)success/iter, (double)failure/iter);
+        printf("Average Time taken: %Lf microseconds\n", averageTime/iter);
+    }
     return (int) 1;
 }
 
-int main(void) {
-    testcall();
+int main(int argc, char *argv[]) {
+    testcall(argc, argv);
     return 0;
 }
