@@ -7,8 +7,8 @@
 
 #define SYS_APP_HELPER 335
 #define DATA_TYPE char
-#define DATA_SIZE 1024*sizeof(DATA_TYPE)
-#define ITERS 1
+#define DATA_SIZE 256*sizeof(DATA_TYPE)
+#define ITERS 1000000
 
 #include <stdio.h>
 #include <sys/time.h>
