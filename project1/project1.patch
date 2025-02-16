@@ -35,16 +35,26 @@
  
  
 --- ../project1/linux-5.15.0/mm/mmap.c.orig	2025-02-14 17:53:07.761639651 -0500
-+++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-15 21:23:04.616661204 -0500
-@@ -3832,3 +3832,10 @@
++++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-16 01:24:27.986089045 -0500
+@@ -3832,3 +3832,20 @@
  	return 0;
  }
  subsys_initcall(init_reserve_notifier);
 +
 +SYSCALL_DEFINE2(app_helper, char __user *, buf, size_t, len) {
-+	// printk(KERN_EMERG "before::%s::%lu\n", buf, len);
-+	memset(buf, 1, len);
-+	// printk(KERN_EMERG "after::%s::%lu\n", buf, len);
++	char kbuf;
++	if (buf == NULL || len == 0) {
++		return -EFAULT;
++	}
++
++	if (copy_from_user(&kbuf, buf, len)) {
++		return -EFAULT;
++	}
++
++	memset(&kbuf, 1, len);
++	if (copy_to_user(buf, &kbuf, len)) {
++		return -EFAULT;
++	}
 +	return 0;
 +}
 \ No newline at end of file
