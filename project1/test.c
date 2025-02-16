@@ -24,6 +24,7 @@ int testcall() {
         clock_gettime(CLOCK_REALTIME, &start);
         
         if(syscall(SYS_APP_HELPER, data, DATA_SIZE) == -1) {
+            printf("Error: %d::%s\n", errno, strerror(errno));
             free(data);
             free(check);
             failure++;
@@ -42,7 +43,7 @@ int testcall() {
         free(check);
     }
 
-    printf("Total Iters: %l, Success Iters: %l, Failure Iters: %l\n", iter, success, failure);
+    printf("Total Iters: %ld, Success Iters: %ld, Failure Iters: %ld\n", iter, success, failure);
     printf("Success Rate: %f, Failure Rate: %f\n", (double)success/iter, (double)failure/iter);
     printf("Average Time taken: %Lf nanoseconds\n", averageTime/iter);
     return (int) 1;

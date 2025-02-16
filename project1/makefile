@@ -1,7 +1,7 @@
 all: compile
 
 compile: 
-	gcc test.c -o test.o
+	gcc -g test.c -o test.o
 
 clean:
 	rm test.o
