@@ -35,8 +35,8 @@
  
  
 --- ../project1/linux-5.15.0/mm/mmap.c.orig	2025-02-14 17:53:07.761639651 -0500
-+++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-16 09:39:53.385654567 -0500
-@@ -3832,3 +3832,33 @@
++++ ../project1/linux-5.15.0/mm/mmap.c	2025-02-16 10:52:37.391980376 -0500
+@@ -3832,3 +3832,27 @@
  	return 0;
  }
  subsys_initcall(init_reserve_notifier);
@@ -44,11 +44,9 @@
 +SYSCALL_DEFINE2(app_helper, char __user *, buf, size_t, len) {
 +	char *kbuf = NULL;
 +	long retval = -EFAULT;
-+	printk(KERN_INFO "app_helper called\n");
 +	if (buf != NULL && len != 0) {
 +		kbuf = kmalloc(len, GFP_KERNEL);
 +		if (kbuf == NULL) {
-+			printk(KERN_EMERG "mem not available\n");
 +			return -ENOMEM;
 +		}
 +		
@@ -57,11 +55,7 @@
 +			
 +			if (!copy_to_user(buf, kbuf, len)) {
 +				retval = 0;
-+			} else {
-+				printk(KERN_EMERG "copy to user failed...\n");
 +			}
-+		} else {
-+			printk(KERN_EMERG "copy from user failed...\n");
 +		}
 +	}
 +
