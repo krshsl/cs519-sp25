@@ -5,7 +5,7 @@
 #include <errno.h>
 
 #define SYS_APP_HELPER 335
-#define DATA_TYPE char
+#define DATA_TYPE int
 #define DATA_SIZE 1024*sizeof(DATA_TYPE)
 
 int testcall() {
@@ -20,6 +20,7 @@ int testcall() {
     if(syscall(SYS_APP_HELPER, data, DATA_SIZE) == -1) {
         fprintf(stderr, "Error calling syscall: %s\n", strerror(errno));
         free(data);
+        free(check);
         return -1;
     }
 
@@ -28,10 +29,12 @@ int testcall() {
     } else {
         printf("The system call did not return the expected result\n");
     }
+    free(data);
+    free(check);
     return (int) 1;
 };
 
 int main(void) {
-    printf("The return code from the helloworld system call is %d\n", testcall());  
+    testcall();
     return 0;
 }
