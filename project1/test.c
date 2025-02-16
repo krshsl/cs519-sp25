@@ -8,7 +8,7 @@
 #define SYS_APP_HELPER 335
 #define DATA_TYPE char
 #define DATA_SIZE 1024*sizeof(DATA_TYPE)
-#define ITERS 1000000
+#define ITERS 10000000
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -23,7 +23,7 @@ int testcall(int argc, char *argv[]) {
     long long start_time, end_time;
     long double averageTime = 0;
     long success, failure, iter;
-    success = failure = 0;
+    success = failure = 0L;
     for (iter = 0; iter < ITERS; iter++) {
         struct timespec start, end;
         DATA_TYPE *data = malloc(DATA_SIZE), *check = malloc(DATA_SIZE);
@@ -52,7 +52,7 @@ int testcall(int argc, char *argv[]) {
     }
 
     if (argc > 1 && strcmp(argv[1], "csv") == 0) {
-        printf("%ld,%Lf,%Lf,", iter, (double)success/iter, (double)failure/iter);
+        printf("%ld,%Lf,%Lf,", iter, (long double)success/iter, (long double)failure/iter);
         printf("%Lf\n", averageTime/iter);
     } else {
         printf("Total Iters: %ld, Success Iters: %ld, Failure Iters: %ld\n", iter, success, failure);

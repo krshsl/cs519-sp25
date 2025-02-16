@@ -1,5 +1,8 @@
 from re import sub
 from subprocess import run
+from time import sleep
+import pandas as pd
+import matplotlib.pyplot as plt
 
 data_types = {
     'char': 1,
@@ -31,12 +34,13 @@ def run_tests(oFile):
         for size in sizes:
             curr_test = f"Running test for {data_type} and size {size}"
             print(curr_test)
-            oFile.write(f"{data_type},{size}")
+            oFile.write(f"{data_type},{size},")
             updated_content = update_content(content, data_type, size)
             with open('test.c', 'w') as file:
                 file.write(updated_content)
             
             run_test(oFile)
+            sleep(1) # Sleep for 1 second to avoid overloading the system
             
 
 def reset():
@@ -47,9 +51,32 @@ def reset():
     with open('test.c', 'w') as file:
         file.write(updated_content)
 
+def generate_graph():
+    df = pd.read_csv('output.csv')
+    
+    colors = plt.cm.Paired.colors
+    color_index = 0
+    
+    for data_type in df['Data Type'].unique():
+        subset = df[df['Data Type'] == data_type]
+        plt.plot(subset['Size'], subset['Avg Time Taken(microseconds)'], label=data_type, color=colors[color_index], linewidth=0.5)
+        color_index = (color_index + 1) % len(colors)
+    
+    avg_times = df.groupby('Size')['Avg Time Taken(microseconds)'].mean()
+    plt.plot(avg_times.index, avg_times.values, label='Average', linestyle='--', color='black', linewidth=1)
+
+    plt.xlabel('Size')
+    plt.ylabel('Avg Time Taken (microseconds)')
+    plt.title('Performance Comparison by Data Type and Size')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('performance_comparison.png')
+    plt.show()
+
 if __name__ == '__main__':
-    with open('output.txt', 'w') as oFile:
+    with open('output.csv', 'w') as oFile:
         oFile.write('Data Type,Size,Iterations,Success Rate,Failure Rate,Avg Time Taken(microseconds)\n')
         run_tests(oFile)
 
     reset()
+    generate_graph()
