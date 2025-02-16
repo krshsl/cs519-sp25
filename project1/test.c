@@ -11,38 +11,40 @@
 #define ITERS 1
 
 int testcall() {
-    long double average = 0;
-    for (int i = 0; i < ITERS; i++) {
+    long double averageTime = 0;
+    long success, failure, iter;
+    success = failure = 0;
+    for (iter = 0; iter < ITERS; iter++) {
         struct timespec start, end;
         DATA_TYPE *data = malloc(DATA_SIZE), *check = malloc(DATA_SIZE);
-        if(data == NULL || check == NULL) {
-            fprintf(stderr, "Error allocating memory: %s\n", strerror(errno));
-            return -1;
-        }
+        
+        if(data == NULL || check == NULL) break;
         memset(data, 4, DATA_SIZE);
         memset(check, 1, DATA_SIZE);
-
         clock_gettime(CLOCK_REALTIME, &start);
+        
         if(syscall(SYS_APP_HELPER, data, DATA_SIZE) == -1) {
-            fprintf(stderr, "Error calling syscall: %s\n", strerror(errno));
             free(data);
             free(check);
-            return -1;
+            failure++;
+            continue;
         }
         clock_gettime(CLOCK_REALTIME, &end);
         long timeElapsed = (end.tv_sec - start.tv_sec) * 1000000000L + (end.tv_nsec - start.tv_nsec);
-        average += timeElapsed;
-        // printf("Time taken: %ld nanoseconds\n", timeElapsed);
+        averageTime += timeElapsed;
+        
         if (memcmp(data, check, DATA_SIZE) == 0) {
-            // printf("The system call returned the expected result\n");
+            success++;
         } else {
-            printf("The system call did not return the expected result\n");
+            failure++;
         }
         free(data);
         free(check);
     }
 
-    printf("Average Time taken: %Lf nanoseconds\n", average/ITERS);
+    printf("Total Iters: %l, Success Iters: %l, Failure Iters: %l\n", iter, success, failure);
+    printf("Success Rate: %f, Failure Rate: %f\n", (double)success/iter, (double)failure/iter);
+    printf("Average Time taken: %Lf nanoseconds\n", averageTime/iter);
     return (int) 1;
 }
 
