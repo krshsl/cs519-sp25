@@ -3,15 +3,22 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <time.h>
+#include <pthread.h>
+#include <sys/time.h>
 
 #define SYS_APP_HELPER 335
 #define DATA_TYPE char
 #define DATA_SIZE 1024*sizeof(DATA_TYPE)
-#define ITERS 10000000
+#define ITERS 1000000
+#define THREADS 40
 
-#include <stdio.h>
-#include <sys/time.h>
+struct analysis {
+    long double averageTime;
+    long success;
+    long failure;
+    long iter;
+    int threads;
+};
 
 long long current_timestamp_micros() {
     struct timeval tv;
@@ -19,12 +26,21 @@ long long current_timestamp_micros() {
     return (long long)tv.tv_sec * 1000000LL + tv.tv_usec;
 }
 
-int testcall(int argc, char *argv[]) {
+void print_analysis(int argc, char *argv[], struct analysis *a) {
+    if (argc > 2 && strcmp(argv[2], "csv") == 0) {
+        printf("%ld,%Lf,%Lf,", a->iter, (long double)a->success/a->iter, (long double)a->failure/a->iter);
+        printf("%Lf,%s,%d\n", a->averageTime/a->iter, argv[1], a->threads);
+    } else {
+        printf("Total Iters: %ld, Success Iters: %ld, Failure Iters: %ld\n", a->iter, a->success, a->failure);
+        printf("Success Rate: %f, Failure Rate: %f\n", (double)a->success/a->iter, (double)a->failure/a->iter);
+        printf("Average Time taken: %Lf microseconds\n", a->averageTime/a->iter);
+    }
+}
+
+void perform_test(struct analysis **aPtr) {
+    struct analysis *a = *aPtr;
     long long start_time, end_time;
-    long double averageTime = 0;
-    long success, failure, iter;
-    success = failure = 0L;
-    for (iter = 0; iter < ITERS; iter++) {
+    for (; a->iter < ITERS; a->iter++) {
         struct timespec start, end;
         DATA_TYPE *data = malloc(DATA_SIZE), *check = malloc(DATA_SIZE);
         
@@ -36,33 +52,85 @@ int testcall(int argc, char *argv[]) {
         if(syscall(SYS_APP_HELPER, data, DATA_SIZE) == -1) {
             free(data);
             free(check);
-            failure++;
+            a->failure++;
             continue;
         }
         end_time = current_timestamp_micros();
-        averageTime += end_time - start_time;
+        a->averageTime += end_time - start_time;
         
         if (memcmp(data, check, DATA_SIZE) == 0) {
-            success++;
+            a->success++;
         } else {
-            failure++;
+            a->failure++;
         }
         free(data);
         free(check);
     }
+}
 
-    if (argc > 1 && strcmp(argv[1], "csv") == 0) {
-        printf("%ld,%Lf,%Lf,", iter, (long double)success/iter, (long double)failure/iter);
-        printf("%Lf\n", averageTime/iter);
-    } else {
-        printf("Total Iters: %ld, Success Iters: %ld, Failure Iters: %ld\n", iter, success, failure);
-        printf("Success Rate: %f, Failure Rate: %f\n", (double)success/iter, (double)failure/iter);
-        printf("Average Time taken: %Lf microseconds\n", averageTime/iter);
+int testcall(int argc, char *argv[]) {
+    struct analysis *a = malloc(sizeof(struct analysis));
+    a->averageTime = a->success = a->iter = a->failure = 0L;
+    a->threads = 0;
+    perform_test(&a);
+    print_analysis(argc, argv, a);    
+    free(a);
+    return (int) 1;
+}
+
+void *testcall_t(void *arg) {
+    struct analysis *a = (struct analysis *)arg;
+    perform_test(&a);
+    return NULL;
+}
+
+
+int testcalls(int argc, char *argv[]) {
+    pthread_t *thr;
+    struct analysis *a = malloc(sizeof(struct analysis)*THREADS);
+    
+    for (int i = 0; i < THREADS; i++) {
+        a[i].averageTime = a[i].success = a[i].iter = a[i].failure = 0L;
     }
+    thr = calloc(sizeof(*thr), THREADS);
+
+    for (int i = 0; i < THREADS; i++) {
+        pthread_create(&thr[i], NULL, testcall_t, &a[i]);
+    }
+
+    for (int i = 0; i < THREADS; i++) {
+        pthread_join(thr[i], NULL);
+    }
+    struct analysis *aF = malloc(sizeof(struct analysis));
+    aF->averageTime = aF->success = aF->iter = aF->failure = 0L;
+    aF->threads = THREADS;
+
+    for (int i = 0; i < THREADS; i++) {
+        aF->iter += a[i].iter;
+        aF->success += a[i].success;
+        aF->failure += a[i].failure;
+        aF->averageTime += a[i].averageTime;
+    }
+    print_analysis(argc, argv, aF);
+    free(aF);
+    free(thr);
+    free(a);
     return (int) 1;
 }
 
 int main(int argc, char *argv[]) {
-    testcall(argc, argv);
+    if (argc < 2) {
+        printf("Usage: %s <single/thread> [csv]\n", argv[0]);
+        return 1;
+    }
+
+    if (strcmp(argv[1], "single") == 0) {
+        testcall(argc, argv);
+    } else if (strcmp(argv[1], "thread") == 0) {
+        testcalls(argc, argv);
+    } else {
+        printf("Invalid argument: %s\n", argv[1]);
+        return 1;
+    }
     return 0;
 }
