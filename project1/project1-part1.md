@@ -1,4 +1,3 @@
-## Spring 2025 - CS 519 - Project 1 Part-A  (40 points, Due Feb 19th, 11:55pm) 
 
 **CAUTION:** Copying code from online sources or automatic generation tools is
 not acceptable and will be reported.
@@ -44,7 +43,6 @@ cd linux-5.15.0
 Then run the installation script. 
 
 **Note, this script can be run only for the first time installation of the kernel in a CloudLab node.** 
-This script also installs a bunch of debian related packages required for compilation.
 ```
 ../install_packages.sh
 ```
@@ -91,7 +89,6 @@ For practical guidance on how to integrate a new system call, refer to the follo
 - [Reference 2](https://macboypro.wordpress.com/2009/05/15/adding-a-custom-system-call-to-the-linux-os/)  
 
 (You can also find many additional resources online if you need further clarification.)
-
 
 ---
 
