@@ -21,14 +21,16 @@
 #include <sys/wait.h>
 
 //Add all your global variables and definitions here.
-#define MATRIX_SIZE 10000
+#define MATRIX_SIZE 8192
 // floating point precision issues if value exceeds certain thresholds
 #define MAX_VALUE (MATRIX_SIZE <= 1024 ? 240 : \
 				 (MATRIX_SIZE <= 4096 ? 100 : \
 				 (MATRIX_SIZE <= 8192 ? 10 : 4)))
 #define MAX_CORES 40
-#define BLOCKS_PER_CORE MATRIX_SIZE/MAX_CORES // to ensure semaphores avoid a waiting spree
+#define BLOCKS_PER_CORE (MATRIX_SIZE*log2(MATRIX_SIZE))/MAX_CORES // to ensure semaphores avoid a waiting spree
 #define IS_VALIDATE_MATRIX 1
+#define VALIDATE_MAX_SIZE MATRIX_SIZE+1
+#define PRINT_CAP 4
 
 #define MINF(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define MAXF(X, Y) (((X) > (Y)) ? (X) : (Y))
@@ -145,13 +147,13 @@ float random_num(float min, float max) {
 }
 
 void init_grid_block(struct grid_block *gblock) {
-	int min_blocks = BLOCKS_PER_CORE;
+	int min_blocks = MAXF(BLOCKS_PER_CORE, 2*maxCores);
 	gblock->grid_row = floor(sqrt(min_blocks));
 	gblock->grid_col = ceil((float)min_blocks / gblock->grid_row);
 	gblock->block_row = ceil((float)MATRIX_SIZE / gblock->grid_row);
 	gblock->block_col = ceil((float)MATRIX_SIZE / gblock->grid_col);	
 	gblock->block_size = gblock->block_row * gblock->block_row * sizeof(float);
-	gblock->total_blocks = gblock->grid_row * gblock->grid_col;
+	gblock->total_blocks = gblock->grid_row * gblock->grid_row;
 	
 	if (gblock->total_blocks < min_blocks) {
 		gblock->grid_row++;
@@ -159,10 +161,9 @@ void init_grid_block(struct grid_block *gblock) {
 		gblock->block_row = ceil((float)MATRIX_SIZE / gblock->grid_row);
 		gblock->block_col = ceil((float)MATRIX_SIZE / gblock->grid_col);
 		gblock->block_size = gblock->block_row * gblock->block_row * sizeof(float);
-		gblock->total_blocks = gblock->grid_row * gblock->grid_col;
+		gblock->total_blocks = gblock->grid_row * gblock->grid_row;
 	}
 }
-
 
 float **init_matrix(int size, unsigned char is_zero) {
    	float **matrix = (float **)malloc(size * sizeof(float *));
@@ -181,7 +182,7 @@ float **init_matrix(int size, unsigned char is_zero) {
 }
 
 void print_matrix(float **matrix, int size, const char *msg) {
-	if (size > 5) {
+	if (size > PRINT_CAP) {
 		return;
 	}
 
@@ -195,7 +196,7 @@ void print_matrix(float **matrix, int size, const char *msg) {
 }
 
 void print_result(float *matrix, int size, const char *msg) {
-	if (size > 5) {
+	if (size > PRINT_CAP) {
 		return;
 	}
 
@@ -244,28 +245,18 @@ void child_worker(float **matrix1, float **matrix2, float *result, sem_t *locks,
 				memset(block_buf, 0, gblock->block_size);
 				 
 				x1 = i * gblock->block_row;
-				for (m = 0; m < gblock->block_row; m++, x1++) {
-					if (x1 >= MATRIX_SIZE) {
-						break;
-					}
-					y2 = k * gblock->block_row;
-					pos = m * gblock->block_row;
-					for (n = 0; n < gblock->block_row; n++, y2++, pos++) {
-						if (y2 >= MATRIX_SIZE) {
-							break;
-						}
-						x2 = y1 = j * gblock->block_col;
-						for (l = 0; l < gblock->block_col; l++, x2++, y1++) {
-							if (y1 >= MATRIX_SIZE || x2 >= MATRIX_SIZE) {
-								break;
-							}
-							// printf("child %d::%d,%d,%d\n", id, m, n, l);
+				for (m = 0; m < gblock->block_row && x1 < MATRIX_SIZE; m++, x1++) {
+					y1 = j * gblock->block_col;
+					x2 = j*gblock->block_col;
+					for (l = 0; l < gblock->block_col && y1 < MATRIX_SIZE && x2 < MATRIX_SIZE; l++, x2++, y1++) {
+						pos = m * gblock->block_row;
+						y2 = k * gblock->block_row;
+						for (n = 0; n < gblock->block_row && y2 < MATRIX_SIZE; n++, y2++, pos++) {
 							block_buf[pos] += matrix1[x1][y1] * matrix2[x2][y2];
 						}
 					}
 				}
 
-				sem_wait(&locks[lock_id]);
 				x1 = i * gblock->block_row;
 				for (m = 0; m < gblock->block_row; m++, x1++) {
 					if (x1 >= MATRIX_SIZE) {
@@ -274,14 +265,15 @@ void child_worker(float **matrix1, float **matrix2, float *result, sem_t *locks,
 					y1 = k * gblock->block_row;
 					pos = m * gblock->block_row;
 					r_pos = x1 * MATRIX_SIZE + y1;
+					sem_wait(&locks[lock_id]);
 					for (n = 0; n < gblock->block_row; n++, y1++, r_pos++, pos++) {
 						if (y1 >= MATRIX_SIZE) {
 							break;
 						}
 						result[r_pos] += block_buf[pos];
 					}
+					sem_post(&locks[lock_id]);
 				}
-				sem_post(&locks[lock_id]);
 			}
 		}
 	}
@@ -311,32 +303,45 @@ void wait_workers() {
 }
 
 void validate_mult(float **matrix1, float **matrix2, float *result) {
-	if (!IS_VALIDATE_MATRIX || (print_mode == 1) || MATRIX_SIZE > 2049) {
+	if (!IS_VALIDATE_MATRIX || (print_mode == 1) || MATRIX_SIZE > VALIDATE_MAX_SIZE) {
 		return;
 	}
 
-	float **verify = init_matrix(MATRIX_SIZE, 0);
-	size_t pos, count = 0;
+	float sum = 0;
+	size_t pos = 0;
 	for (int i = 0; i < MATRIX_SIZE; i++) {
-		pos = i * MATRIX_SIZE;
 		for (int j = 0; j < MATRIX_SIZE; j++, pos++) {
-			verify[i][j] = 0;
-			for (int k = 0; k < MATRIX_SIZE; k++, count++) {
-				verify[i][j] += matrix1[i][k] * matrix2[k][j];
+			sum = 0;
+			for (int k = 0; k < MATRIX_SIZE; k++) {
+				sum += matrix1[i][k] * matrix2[k][j];
 			}
 			
-			if (fabs(verify[i][j] - result[pos]) > 0.0001) {
+			if (fabs(sum - result[pos]) > 0.0001) {
 				printf("Validation failed at %d %d\n", i, j);
-				printf("Expected: %f, Actual: %f\n", verify[i][j], result[pos]);
+				printf("Expected: %f, Actual: %f\n", sum, result[pos]);
 				exit(EXIT_FAILURE);
 			}
 			
-			if (count > 16*MATRIX_SIZE*MATRIX_SIZE) // verify a subset of the matrix will be enough
+			if (pos > 16*MATRIX_SIZE) // verify a subset of the matrix will be enough
 				break;
 		}
 
-		if (count > 16*MATRIX_SIZE*MATRIX_SIZE)
+		if (pos > 16*MATRIX_SIZE)
 			break;
+	}
+	printf("Matrix validation successful\n");
+	
+	if (MATRIX_SIZE > PRINT_CAP) {
+		return;
+	}
+	float **verify = init_matrix(MATRIX_SIZE, 0);
+	for (int i = 0; i < MATRIX_SIZE; i++) {
+		for (int j = 0; j < MATRIX_SIZE; j++) {
+			verify[i][j] = 0;
+			for (int k = 0; k < MATRIX_SIZE; k++) {
+				verify[i][j] += matrix1[i][k] * matrix2[k][j];
+			}
+		}
 	}
 	print_matrix(verify, MATRIX_SIZE, "Actual Matrix");
 	free_matrix(verify, MATRIX_SIZE);

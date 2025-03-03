@@ -23,14 +23,16 @@
 #include <sys/wait.h>
 
 //Add all your global variables and definitions here.
-#define MATRIX_SIZE 32
+#define MATRIX_SIZE 4096
 #define MAX_BLOCK_SIZE 64 // hard limit for block size to not exceed 32k bytes
 // floating point precision issues if value exceeds certain thresholds
 #define MAX_VALUE (MATRIX_SIZE <= 1024 ? 240 : \
 				 (MATRIX_SIZE <= 4096 ? 100 : \
 				 (MATRIX_SIZE <= 8192 ? 10 : 4)))
-#define MAX_CORES 2
+#define MAX_CORES 40
 #define IS_VALIDATE_MATRIX 1
+#define VALIDATE_MAX_SIZE MATRIX_SIZE+1
+#define PRINT_CAP 4
 
 #define MINF(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define MAXF(X, Y) (((X) > (Y)) ? (X) : (Y))
@@ -140,7 +142,6 @@ void init_grid_block(struct grid_block *gblock) {
 	gblock->block_size = gblock->block_row * gblock->block_row * sizeof(float);
 }
 
-
 float **init_matrix(int size, unsigned char is_zero) {
    	float **matrix = (float **)malloc(size * sizeof(float *));
    	for (int i = 0; i < size; i++) {
@@ -158,7 +159,7 @@ float **init_matrix(int size, unsigned char is_zero) {
 }
 
 void print_matrix(float **matrix, int size, const char *msg) {
-	if (size > 5) {
+	if (size > PRINT_CAP) {
 		return;
 	}
 
@@ -189,7 +190,6 @@ void init_pipes(int fd[maxCores][2]) {
 
 void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], struct grid_block *gblock, int id) {
 	float *block_buf = malloc(gblock->block_size);
-	float curr = 0;
 	size_t count, x1, x2, y1, y2, pos;
 	size_t i, j, k, m, n, l;
 	count = 0;
@@ -213,26 +213,15 @@ void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], struct g
 				 
 				// process for ij * jk -> ik
 				x1 = i * gblock->block_row;
-				for (m = 0; m < gblock->block_row; m++, x1++) {
-					if (x1 >= MATRIX_SIZE) {
-						break;
-					}
-					y2 = k * gblock->block_row;
-					pos = m * gblock->block_row;
-					for (n = 0; n < gblock->block_row; n++, y2++, pos++) {
-						if (y2 >= MATRIX_SIZE) {
-							break;
+				for (m = 0; m < gblock->block_row && x1 < MATRIX_SIZE; m++, x1++) {
+					y1 = j * gblock->block_col;
+					x2 = j*gblock->block_col;
+					for (l = 0; l < gblock->block_col && y1 < MATRIX_SIZE && x2 < MATRIX_SIZE; l++, x2++, y1++) {
+						pos = m * gblock->block_row;
+						y2 = k * gblock->block_row;
+						for (n = 0; n < gblock->block_row && y2 < MATRIX_SIZE; n++, y2++, pos++) {
+							block_buf[pos] += matrix1[x1][y1] * matrix2[x2][y2];
 						}
-						x2 = y1 = j * gblock->block_col;
-						curr = 0;
-						for (l = 0; l < gblock->block_col; l++, x2++, y1++) {
-							if (y1 >= MATRIX_SIZE || x2 >= MATRIX_SIZE) {
-								break;
-							}
-							// printf("child %d::%d,%d,%d\n", id, m, n, l);
-							curr += matrix1[x1][y1] * matrix2[x2][y2];
-						}
-						block_buf[pos] = curr;
 					}
 				}
 				ssize_t bytes_written = write(fd[id][1], block_buf, gblock->block_size);
@@ -353,31 +342,48 @@ void process_blocks(struct grid_block *gblock, int fd[maxCores][2], float **resu
 }
 
 void validate_mult(float **matrix1, float **matrix2, float **result) {
-	if (!IS_VALIDATE_MATRIX || (print_mode == 1) || MATRIX_SIZE > 1024) {
+	if (!IS_VALIDATE_MATRIX || (print_mode == 1) || MATRIX_SIZE > VALIDATE_MAX_SIZE) {
 		return;
 	}
 
-	float **verify = init_matrix(MATRIX_SIZE, 0);
+	float sum = 0;
 	size_t count = 0;
+	
+	// Standard matrix multiplication algorithm for validation
+	for (int i = 0; i < MATRIX_SIZE; i++) {
+		for (int j = 0; j < MATRIX_SIZE; j++, count++) {
+			sum = 0;
+			for (int k = 0; k < MATRIX_SIZE; k++) {
+				sum += matrix1[i][k] * matrix2[k][j];
+			}
+			
+			// Validate result
+			if (fabs(sum - result[i][j]) >= 0.0001) {
+				printf("Validation failed at %d %d\n", i, j);
+				printf("Expected: %f, Actual: %f\n", sum, result[i][j]);
+				exit(EXIT_FAILURE);
+			}
+			
+			if (count > 16*MATRIX_SIZE) // verify a subset of the matrix will be enough
+				break;
+		}
+		
+		if (count > 16*MATRIX_SIZE)
+			break;
+	}
+	printf("Matrix validation successful\n");
+
+	if (MATRIX_SIZE > PRINT_CAP) {
+		return;
+	}
+	float **verify = init_matrix(MATRIX_SIZE, 0);
 	for (int i = 0; i < MATRIX_SIZE; i++) {
 		for (int j = 0; j < MATRIX_SIZE; j++) {
 			verify[i][j] = 0;
-			for (int k = 0; k < MATRIX_SIZE; k++, count++) {
+			for (int k = 0; k < MATRIX_SIZE; k++) {
 				verify[i][j] += matrix1[i][k] * matrix2[k][j];
 			}
-			
-			if (fabs(verify[i][j] - result[i][j]) >= 0.0001) {
-				printf("Validation failed at %d %d\n", i, j);
-				printf("Expected: %f, Actual: %f\n", verify[i][j], result[i][j]);
-				exit(EXIT_FAILURE);
-			}
-
-			if (count > 16*MATRIX_SIZE*MATRIX_SIZE) // verify a subset of the matrix will be enough
-				break;
 		}
-
-		if (count > 16*MATRIX_SIZE*MATRIX_SIZE)
-			break;
 	}
 	print_matrix(verify, MATRIX_SIZE, "Actual Matrix");
 	free_matrix(verify, MATRIX_SIZE);
