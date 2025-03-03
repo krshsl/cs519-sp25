@@ -20,7 +20,7 @@
 #include <sys/wait.h>
 
 //Add all your global variables and definitions here.
-#define MATRIX_SIZE 8192
+#define MATRIX_SIZE 10000
 // floating point precision issues if value exceeds certain thresholds
 #define MAX_VALUE (MATRIX_SIZE <= 1024 ? 240 : \
 				 (MATRIX_SIZE <= 4096 ? 100 : \

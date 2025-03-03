@@ -23,7 +23,7 @@
 #include <sys/wait.h>
 
 //Add all your global variables and definitions here.
-#define MATRIX_SIZE 4096
+#define MATRIX_SIZE 10000
 #define MAX_BLOCK_SIZE 64 // hard limit for block size to not exceed 32k bytes
 // floating point precision issues if value exceeds certain thresholds
 #define MAX_VALUE (MATRIX_SIZE <= 1024 ? 240 : \
@@ -37,7 +37,7 @@
 #define MINF(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define MAXF(X, Y) (((X) > (Y)) ? (X) : (Y))
 
-int maxCores = MINF(MATRIX_SIZE*MATRIX_SIZE, MAX_CORES); // hard limit to not exceed total matrix elements
+int maxCores = MINF(MATRIX_SIZE, MAX_CORES); // hard limit to not exceed total matrix elements
 char print_mode = 0; // print in csv format for easy parsing
 
 void validate_args(int argc, char const **argv);
@@ -166,6 +166,7 @@ void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], int id) 
 				block_buf[j] += matrix1[i][k] * matrix2[k][j];
 			}
 		}
+
 		ssize_t bytes_written = write(fd[id][1], block_buf, size);
 		while (bytes_written < size) {
 			bytes_written += write(fd[id][1], block_buf + bytes_written, MATRIX_SIZE - bytes_written);
@@ -229,7 +230,7 @@ void process_blocks(int fd[maxCores][2], float **result) {
 	int id;
 	float *block;
 	size_t size = MATRIX_SIZE * sizeof(float);
-	for (int i = 0; i < maxCores; i++) {
+	for (int i = 0; i < MATRIX_SIZE; i++) {
 		id = i % maxCores;
 		block = result[i];
 		ssize_t bytes_read = read(fd[id][0], block, size);
