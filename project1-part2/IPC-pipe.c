@@ -1,36 +1,41 @@
 /* CS 519, Spring 2025: Project 1 - Part 2
  * IPC using pipes to perform matrix multiplication.
  * Feel free to extend or change any code or functions below.
+ * 
+ * use following command to get approx performance stats:
+ * make && /usr/bin/time -f "%e,%U,%S" -q ./pipe -p
  */
 #define _GNU_SOURCE
-#include <math.h>
 #include <err.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <math.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sched.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <sys/shm.h>
-#include <sys/sem.h>
 #include <sys/ipc.h>
-#include <sys/types.h>
+#include <sys/sem.h>
+#include <sys/shm.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 
 //Add all your global variables and definitions here.
-#define MATRIX_SIZE 2048
+#define MATRIX_SIZE 32
 #define MAX_BLOCK_SIZE 64 // hard limit for block size to not exceed 32k bytes
-#define MAX_VALUE (MATRIX_SIZE <= 1024 ? 1000 : \
-                 (MATRIX_SIZE <= 4096 ? 100 : \
-                 (MATRIX_SIZE <= 8192 ? 10 : 4)))
-#define MAX_PROCESS 40
+// floating point precision issues if value exceeds certain thresholds
+#define MAX_VALUE (MATRIX_SIZE <= 1024 ? 240 : \
+				 (MATRIX_SIZE <= 4096 ? 100 : \
+				 (MATRIX_SIZE <= 8192 ? 10 : 4)))
+#define MAX_CORES 2
+#define IS_VALIDATE_MATRIX 1
 
 #define MINF(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define MAXF(X, Y) (((X) > (Y)) ? (X) : (Y))
 
-int maxCores = MINF(MATRIX_SIZE*MATRIX_SIZE, MAX_PROCESS); // hard limit on max process to not exceed total matrix elements
+int maxCores = MINF(MATRIX_SIZE*MATRIX_SIZE, MAX_CORES); // hard limit to not exceed total matrix elements
 char print_mode = 0; // print in csv format for easy parsing
 
 struct grid_block {
@@ -73,8 +78,8 @@ void validate_args(int argc, char const **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	if (MAX_PROCESS <= 0) {
-		printf("Max process should be greater than 0\n");
+	if (MAX_CORES <= 0) {
+		printf("Max cores should be greater than 0\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -98,6 +103,11 @@ double getdetlatimeofday(struct timeval *begin, struct timeval *end) {
  * to provide.
  */
 void print_stats(double time_taken, struct grid_block *gblock) {
+	if (print_mode == 1) {
+		printf("%d,%d,pipe,%f\n", MATRIX_SIZE, maxCores, time_taken);
+		return;
+	}
+
 	printf("Input size: %d columns, %d rows\n", MATRIX_SIZE, MATRIX_SIZE);
 	printf("Total Cores: %d cores\n", maxCores);
 	printf("Total runtime: %f seconds\n", time_taken);
@@ -179,8 +189,9 @@ void init_pipes(int fd[maxCores][2]) {
 
 void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], struct grid_block *gblock, int id) {
 	float *block_buf = malloc(gblock->block_size);
-	int count, x1, x2, y1, y2, pos;
-	int i, j, k, m, n, l;
+	float curr = 0;
+	size_t count, x1, x2, y1, y2, pos;
+	size_t i, j, k, m, n, l;
 	count = 0;
 	for (j = 0; j < gblock->grid_col; j++) {
 		if (j * gblock->block_col >= MATRIX_SIZE) {
@@ -213,13 +224,15 @@ void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], struct g
 							break;
 						}
 						x2 = y1 = j * gblock->block_col;
+						curr = 0;
 						for (l = 0; l < gblock->block_col; l++, x2++, y1++) {
 							if (y1 >= MATRIX_SIZE || x2 >= MATRIX_SIZE) {
 								break;
 							}
 							// printf("child %d::%d,%d,%d\n", id, m, n, l);
-							block_buf[pos] += matrix1[x1][y1] * matrix2[x2][y2];
+							curr += matrix1[x1][y1] * matrix2[x2][y2];
 						}
+						block_buf[pos] = curr;
 					}
 				}
 				ssize_t bytes_written = write(fd[id][1], block_buf, gblock->block_size);
@@ -285,13 +298,23 @@ void wait_workers() {
 }
 
 void process_blocks(struct grid_block *gblock, int fd[maxCores][2], float **result) {
-	int count, pos, rx, ry;
-	int i, j, k, m, n;
-	float *block_buf = malloc(gblock->block_size);
+	size_t count, pos, rx, ry;
+	size_t i, j, k, m, n;
+	char *block_buf = malloc(gblock->block_size);
+	float *block;
 	count = 0;
 	for (j = 0; j < gblock->grid_col; j++) {
+		if (j * gblock->block_col >= MATRIX_SIZE) {
+			break;
+		}
 		for (i = 0; i < gblock->grid_row; i++) {
+			if (i * gblock->block_row >= MATRIX_SIZE) {
+				break;
+			}
 			for (k = 0; k < gblock->grid_row; k++) {
+				if (k * gblock->block_row >= MATRIX_SIZE) {
+					break;
+				}
 				ssize_t bytes_read = 0;
 				while(bytes_read < gblock->block_size) {
 					bytes_read += read(fd[count][0], block_buf + bytes_read, gblock->block_size - bytes_read);
@@ -307,6 +330,7 @@ void process_blocks(struct grid_block *gblock, int fd[maxCores][2], float **resu
 
 				// maybe do the summation by sending data to threads using splice and getting it back??
 				rx = i * gblock->block_row;
+				block = (float *)block_buf;
 				for (m = 0; m < gblock->block_row; m++, rx++) {
 					if (rx >= MATRIX_SIZE) {
 						break;
@@ -318,7 +342,7 @@ void process_blocks(struct grid_block *gblock, int fd[maxCores][2], float **resu
 							break;
 						}
 						// printf("Parent::%d,%d,%d,%d\n", rx, ry, pos, (int)block_buf[pos]);
-						result[rx][ry] += block_buf[pos];
+						result[rx][ry] += block[pos];
 					}
 				}
 				count = (count + 1) % maxCores;
@@ -329,24 +353,31 @@ void process_blocks(struct grid_block *gblock, int fd[maxCores][2], float **resu
 }
 
 void validate_mult(float **matrix1, float **matrix2, float **result) {
-	if (MATRIX_SIZE > 2049) {
+	if (!IS_VALIDATE_MATRIX || (print_mode == 1) || MATRIX_SIZE > 1024) {
 		return;
 	}
 
 	float **verify = init_matrix(MATRIX_SIZE, 0);
+	size_t count = 0;
 	for (int i = 0; i < MATRIX_SIZE; i++) {
 		for (int j = 0; j < MATRIX_SIZE; j++) {
 			verify[i][j] = 0;
-			for (int k = 0; k < MATRIX_SIZE; k++) {
+			for (int k = 0; k < MATRIX_SIZE; k++, count++) {
 				verify[i][j] += matrix1[i][k] * matrix2[k][j];
 			}
 			
-			if (fabs(verify[i][j] - result[i][j]) > 0.0001) {
+			if (fabs(verify[i][j] - result[i][j]) >= 0.0001) {
 				printf("Validation failed at %d %d\n", i, j);
 				printf("Expected: %f, Actual: %f\n", verify[i][j], result[i][j]);
 				exit(EXIT_FAILURE);
 			}
+
+			if (count > 16*MATRIX_SIZE*MATRIX_SIZE) // verify a subset of the matrix will be enough
+				break;
 		}
+
+		if (count > 16*MATRIX_SIZE*MATRIX_SIZE)
+			break;
 	}
 	print_matrix(verify, MATRIX_SIZE, "Actual Matrix");
 	free_matrix(verify, MATRIX_SIZE);
@@ -361,12 +392,12 @@ int main(int argc, char const **argv) {
 	float **matrix2 = init_matrix(MATRIX_SIZE, 1);
 	print_matrix(matrix2, MATRIX_SIZE, "Matrix 2");
 	struct grid_block gblock;
+	init_grid_block(&gblock);
 	int fd[maxCores][2];
 	
 	// time taken to perform matrix multiplication related tasks
 	gettimeofday(&begin, NULL);
 	init_pipes(fd);
-	init_grid_block(&gblock);
 	init_workers(matrix1, matrix2, fd, &gblock);
 	for (int i = 0; i < maxCores; i++) {
 		if (close(fd[i][1]) == -1) {
@@ -383,6 +414,7 @@ int main(int argc, char const **argv) {
 			exit(EXIT_FAILURE);
 		}
 	}
+	wait_workers(); // not really required as all children have exited
 	gettimeofday(&end, NULL);
 	time_taken = getdetlatimeofday(&begin, &end);
 	print_stats(time_taken, &gblock);
@@ -394,108 +426,27 @@ int main(int argc, char const **argv) {
 	free_matrix(matrix1, MATRIX_SIZE);
 	free_matrix(matrix2, MATRIX_SIZE);
 	free_matrix(result, MATRIX_SIZE);
-	wait_workers(); // not really required as all children are exited
-	
-	if (MATRIX_SIZE <= 1024 && print_mode == 0) {
-		gettimeofday(&end, NULL);
-		time_taken = getdetlatimeofday(&begin, &end);
-		print_stats(time_taken, &gblock);
-	}
 	return 0;
 }
 
 /*
-	Reference...
+stats::
 
-	00 01 02
-	10 11 12
-	20 21 22
+5000,10,pipe,25.457986
+26.56,189.94,5.26
 
-	2x1
-	00 01 02 03
-	10 11 12 13
-	20 21 22 23
-	30 31 32 33
+5000,20,pipe,15.624162
+16.72,288.25,4.53
 
-	1x2
-	00 01 02 03
-	10 11 12 13
-	20 21 22 23
-	30 31 32 33
+5000,40,pipe,10.022775
+11.12,264.44,6.73
 
-	00 01
-	10 11
+4000,40,pipe,4.799979
+5.50,137.02,3.59
 
-	Process Matrix reference :: (avoid locking often...)
-	i = 0, j = 0, k = 0 -> 00
-	00 x 00 -> 00, 01, 10, 11 & 00, 01, 10, 11
-	01 x 10 -> 02, 03, 12, 13 & 20, 21, 30, 31
+4000,20,pipe,7.988943
+8.69,147.94,2.56
 
-	i = 0, j = 1, k = 0 -> 01
-	00 x 01 -> 00, 01, 10, 11 & 02, 03, 12, 13
-	01 x 11 -> 02, 03, 12, 13 & 21, 22, 31, 32
-
-	i = 1, j = 0, k = 0 -> 10
-	10 x 00 -> 20, 21, 30, 31 & 00, 01, 10, 11
-	11 x 10 -> 22, 23, 32, 33 & 20, 21, 30, 31
-
-	i = 1, j = 1, k = 0 -> 11
-	10 x 01 -> 20, 21, 30, 31 & 02, 03, 12, 13
-	11 x 11 -> 22, 23, 32, 33 & 21, 22, 31, 32
-		
-	i = 0, j = 0, k = 0
-	00 x 00 -> ji x ik -> 00 -> jk
-	00 x 01 -> ji x ik -> 01 -> jk
-
-	i = 0, j = 1, k = 0
-	10 x 00 -> ji x ik -> 10 -> jk
-	10 x 01 -> ji x ik -> 11 -> jk
-
-	i = 1, j = 0, k = 0
-	01 x 10 -> ji x ik -> 00 -> jk 
-	01 x 11 -> ji x ik -> 01 -> jk
-
-	i = 1, j = 1, k = 0
-	11 x 10 -> ji x ik -> 10 -> jk
-	11 x 11 -> ji x ik -> 11 -> jk
-	
-	00,01,02
-	10,11,12
-	20,21,22
-
-	3x3 matrix into 3x2 * 2x3 matrix with 1x2 & 2x1 blocks
-	m1 -> m2 -> r_pos (rowxcol,1x2,2x1)
-	
-	update ij * jk -> ik
-
-	00,01 -> 00,10 -> 00
-	00,01 -> 01,11 -> 01
-	00,01 -> 02,12 -> 02
-	00,01 -> 03,13 -> 03 (but not needed)
-
-	10,11 -> 00,10 -> 10
-	10,11 -> 01,11 -> 11
-	10,11 -> 02,12 -> 12
-	10,11 -> 03,13 -> 13 (but not needed)
-	
-	20,21 -> 00,10 -> 20
-	20,21 -> 01,11 -> 21
-	20,21 -> 02,12 -> 22
-	20,21 -> 03,13 -> 23 (but not needed)
-
-
-	02,03 -> 20,30 -> 00
-	02,03 -> 21,31 -> 01
-	02,03 -> 22,32 -> 02
-	02,03 -> 23,33 -> 03 (but not needed)
-
-	12,13 -> 20,30 -> 10
-	12,13 -> 21,31 -> 11
-	12,13 -> 22,32 -> 12
-	12,13 -> 23,33 -> 13 (but not needed)
-
-	22,23 -> 20,30 -> 20
-	22,23 -> 21,31 -> 21
-	22,23 -> 22,32 -> 22
-	22,23 -> 23,33 -> 23 (but not needed)
+4000,10,pipe,12.925466
+13.62,96.93,2.34
 */

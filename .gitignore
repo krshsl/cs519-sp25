@@ -1,4 +1,7 @@
 project1/linux-5.15.0*
 project1/linux_5.15.0*
+
 *.o
+*.out
+
 .vscode/settings.json
