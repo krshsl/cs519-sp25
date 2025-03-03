@@ -40,28 +40,19 @@
 int maxCores = MINF(MATRIX_SIZE*MATRIX_SIZE, MAX_CORES); // hard limit to not exceed total matrix elements
 char print_mode = 0; // print in csv format for easy parsing
 
-struct grid_block {
-	int grid_row;
-	int grid_col;
-	int block_row;
-	int block_col;
-	int block_size;
-};
-
 void validate_args(int argc, char const **argv);
 double getdetlatimeofday(struct timeval *begin, struct timeval *end);
-void print_stats(double time_taken, struct grid_block *gblock);
+void print_stats(double time_taken);
 
 float random_num(float min, float max);
-void init_grid_block(struct grid_block *gblock);
 float **init_matrix(int size, unsigned char is_zero);
 void print_matrix(float **matrix, int size, const char *msg);
 void free_matrix(float **matrix, int size);
 void init_pipes(int fd[maxCores][2]);
-void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], struct grid_block *gblock, int id);
-void init_workers(float **matrix1, float **matrix2, int fd[maxCores][2], struct grid_block *gblock);
-void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], struct grid_block *gblock, int id);
-void process_blocks(struct grid_block *gblock, int fd[maxCores][2], float **result);
+void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], int id);
+void init_workers(float **matrix1, float **matrix2, int fd[maxCores][2]);
+void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], int id);
+void process_blocks(int fd[maxCores][2], float **result);
 void validate_mult(float **matrix1, float **matrix2, float **result);
 
 void validate_args(int argc, char const **argv) {
@@ -104,7 +95,7 @@ double getdetlatimeofday(struct timeval *begin, struct timeval *end) {
 /* Stats function that prints the time taken and other statistics that you wish
  * to provide.
  */
-void print_stats(double time_taken, struct grid_block *gblock) {
+void print_stats(double time_taken) {
 	if (print_mode == 1) {
 		printf("%d,%d,pipe,%f\n", MATRIX_SIZE, maxCores, time_taken);
 		return;
@@ -113,33 +104,10 @@ void print_stats(double time_taken, struct grid_block *gblock) {
 	printf("Input size: %d columns, %d rows\n", MATRIX_SIZE, MATRIX_SIZE);
 	printf("Total Cores: %d cores\n", maxCores);
 	printf("Total runtime: %f seconds\n", time_taken);
-	printf("Blocks used: %dx%d=%d\n", gblock->grid_row, gblock->grid_col, gblock->grid_row*gblock->grid_col);
-	printf("Block size: %dx%d\n", gblock->block_row, gblock->block_col);
 }
 
 float random_num(float min, float max) {
    return min + (int)(rand() / (RAND_MAX / (max - min + 1) + 1));
-}
-
-void init_grid_block(struct grid_block *gblock) {
-	do {
-		gblock->grid_row = floor(sqrt(maxCores));
-		while (maxCores % gblock->grid_row != 0) {
-			gblock->grid_row--;
-		}
-		gblock->grid_col = maxCores / gblock->grid_row;
-		gblock->block_row = ceil((float)MATRIX_SIZE / gblock->grid_row);
-		gblock->block_col = ceil((float)MATRIX_SIZE / gblock->grid_col);
-		if (gblock->block_row > MAX_BLOCK_SIZE || gblock->block_col > MAX_BLOCK_SIZE) {
-			int min_grid_row = ceil((float)MATRIX_SIZE / MAX_BLOCK_SIZE);
-			int min_grid_col = ceil((float)MATRIX_SIZE / MAX_BLOCK_SIZE);
-			gblock->grid_row = MAXF(gblock->grid_row, min_grid_row);
-			gblock->grid_col = MAXF(gblock->grid_col, min_grid_col);
-			gblock->block_row = ceil((float)MATRIX_SIZE / gblock->grid_row);
-			gblock->block_col = ceil((float)MATRIX_SIZE / gblock->grid_col);
-		}
-	} while (gblock->block_row > MAX_BLOCK_SIZE || gblock->block_col > MAX_BLOCK_SIZE);
-	gblock->block_size = gblock->block_row * gblock->block_row * sizeof(float);
 }
 
 float **init_matrix(int size, unsigned char is_zero) {
@@ -188,62 +156,33 @@ void init_pipes(int fd[maxCores][2]) {
 	}
 }
 
-void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], struct grid_block *gblock, int id) {
-	float *block_buf = malloc(gblock->block_size);
-	size_t count, x1, x2, y1, y2, pos;
-	size_t i, j, k, m, n, l;
-	count = 0;
-	for (j = 0; j < gblock->grid_col; j++) {
-		if (j * gblock->block_col >= MATRIX_SIZE) {
-			break;
-		}
-		for (i = 0; i < gblock->grid_row; i++) {
-			if (i * gblock->block_row >= MATRIX_SIZE) {
-				break;
+void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], int id) {
+	size_t size = MATRIX_SIZE * sizeof(float);
+	float *block_buf = malloc(size);
+	for (int i = id; i < MATRIX_SIZE; i+=maxCores) {
+		memset(block_buf, 0, size);
+		for (int k = 0; k < MATRIX_SIZE; k++) {
+			for (int j = 0; j < MATRIX_SIZE; j++) {
+				block_buf[j] += matrix1[i][k] * matrix2[k][j];
 			}
-			for (k = 0; k < gblock->grid_row; k++) {
-				if (k * gblock->block_row >= MATRIX_SIZE) {
-					break;
-				}
+		}
+		ssize_t bytes_written = write(fd[id][1], block_buf, size);
+		while (bytes_written < size) {
+			bytes_written += write(fd[id][1], block_buf + bytes_written, MATRIX_SIZE - bytes_written);
+			if (bytes_written < 0) {
+				perror("write failed");
+				exit(EXIT_FAILURE);
+			}
 
-				if (count++ % maxCores != id) {
-					continue;
-				}
-				memset(block_buf, 0, gblock->block_size);
-				 
-				// process for ij * jk -> ik
-				x1 = i * gblock->block_row;
-				for (m = 0; m < gblock->block_row && x1 < MATRIX_SIZE; m++, x1++) {
-					y1 = j * gblock->block_col;
-					x2 = j*gblock->block_col;
-					for (l = 0; l < gblock->block_col && y1 < MATRIX_SIZE && x2 < MATRIX_SIZE; l++, x2++, y1++) {
-						pos = m * gblock->block_row;
-						y2 = k * gblock->block_row;
-						for (n = 0; n < gblock->block_row && y2 < MATRIX_SIZE; n++, y2++, pos++) {
-							block_buf[pos] += matrix1[x1][y1] * matrix2[x2][y2];
-						}
-					}
-				}
-				ssize_t bytes_written = write(fd[id][1], block_buf, gblock->block_size);
-				while (bytes_written < gblock->block_size) {
-					bytes_written += write(fd[id][1], block_buf + bytes_written, gblock->block_size - bytes_written);
-					if (bytes_written < 0) {
-						perror("write failed");
-						exit(EXIT_FAILURE);
-					}
-
-					if (bytes_written < sizeof(float)) {
-						sched_yield();
-					}
-				}
-    			// printf("Child %d wrote %zd bytes\n", id, bytes_written);
+			if (bytes_written < sizeof(float)) {
+				sched_yield();
 			}
 		}
 	}
 	free(block_buf);
 }
 
-void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], struct grid_block *gblock, int id) {
+void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], int id) {
 	// printf("Child %d::%d started\n", id, getpid());
 	for (int i = 0; i < maxCores; i++) {
 		if (i != id) {
@@ -257,7 +196,7 @@ void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], struct 
 			exit(EXIT_FAILURE);
 		}
 	}
-	matrix_mult(matrix1, matrix2, fd, gblock, id);
+	matrix_mult(matrix1, matrix2, fd, id);
 	if(close(fd[id][1]) == -1) {
 		perror("close write failed - child");
 		exit(EXIT_FAILURE);
@@ -266,7 +205,7 @@ void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], struct 
 	exit(0);
 }
 
-void init_workers(float **matrix1, float **matrix2, int fd[maxCores][2], struct grid_block *gblock) {
+void init_workers(float **matrix1, float **matrix2, int fd[maxCores][2]) {
 	pid_t pid;
 	for (int i = 0; i < maxCores; i++) {
 		pid = fork();
@@ -275,7 +214,7 @@ void init_workers(float **matrix1, float **matrix2, int fd[maxCores][2], struct 
             perror("fork failed");
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
-			child_worker(matrix1, matrix2, fd, gblock, i);
+			child_worker(matrix1, matrix2, fd, i);
 		}
 	}
 }
@@ -286,59 +225,26 @@ void wait_workers() {
 	}
 }
 
-void process_blocks(struct grid_block *gblock, int fd[maxCores][2], float **result) {
-	size_t count, pos, rx, ry;
-	size_t i, j, k, m, n;
-	char *block_buf = malloc(gblock->block_size);
+void process_blocks(int fd[maxCores][2], float **result) {
+	int id;
 	float *block;
-	count = 0;
-	for (j = 0; j < gblock->grid_col; j++) {
-		if (j * gblock->block_col >= MATRIX_SIZE) {
-			break;
-		}
-		for (i = 0; i < gblock->grid_row; i++) {
-			if (i * gblock->block_row >= MATRIX_SIZE) {
-				break;
+	size_t size = MATRIX_SIZE * sizeof(float);
+	for (int i = 0; i < maxCores; i++) {
+		id = i % maxCores;
+		block = result[i];
+		ssize_t bytes_read = read(fd[id][0], block, size);
+		while(bytes_read < size) {
+			bytes_read += read(fd[id][0], block + bytes_read, size - bytes_read);
+			if (bytes_read < 0) {
+				perror("read failed");
+				exit(EXIT_FAILURE);
 			}
-			for (k = 0; k < gblock->grid_row; k++) {
-				if (k * gblock->block_row >= MATRIX_SIZE) {
-					break;
-				}
-				ssize_t bytes_read = 0;
-				while(bytes_read < gblock->block_size) {
-					bytes_read += read(fd[count][0], block_buf + bytes_read, gblock->block_size - bytes_read);
-					if (bytes_read < 0) {
-						perror("read failed");
-						exit(EXIT_FAILURE);
-					}
 
-					if (bytes_read < gblock->block_size) {
-						sched_yield();
-					}
-				}
-
-				// maybe do the summation by sending data to threads using splice and getting it back??
-				rx = i * gblock->block_row;
-				block = (float *)block_buf;
-				for (m = 0; m < gblock->block_row; m++, rx++) {
-					if (rx >= MATRIX_SIZE) {
-						break;
-					}
-					ry = k * gblock->block_row;
-					pos = m * gblock->block_row;
-					for (n = 0; n < gblock->block_row; n++, ry++, pos++) {
-						if (ry >= MATRIX_SIZE) {
-							break;
-						}
-						// printf("Parent::%d,%d,%d,%d\n", rx, ry, pos, (int)block_buf[pos]);
-						result[rx][ry] += block[pos];
-					}
-				}
-				count = (count + 1) % maxCores;
+			if (bytes_read < MATRIX_SIZE) {
+				sched_yield();
 			}
 		}
 	}
-	free(block_buf);
 }
 
 void validate_mult(float **matrix1, float **matrix2, float **result) {
@@ -397,14 +303,12 @@ int main(int argc, char const **argv) {
 	print_matrix(matrix1, MATRIX_SIZE, "Matrix 1");
 	float **matrix2 = init_matrix(MATRIX_SIZE, 1);
 	print_matrix(matrix2, MATRIX_SIZE, "Matrix 2");
-	struct grid_block gblock;
-	init_grid_block(&gblock);
 	int fd[maxCores][2];
 	
 	// time taken to perform matrix multiplication related tasks
 	gettimeofday(&begin, NULL);
 	init_pipes(fd);
-	init_workers(matrix1, matrix2, fd, &gblock);
+	init_workers(matrix1, matrix2, fd);
 	for (int i = 0; i < maxCores; i++) {
 		if (close(fd[i][1]) == -1) {
 			perror("close write failed - parent");
@@ -412,7 +316,7 @@ int main(int argc, char const **argv) {
 		}
 	}
 	float **result = init_matrix(MATRIX_SIZE, 0); // avoiding init at start to save some memory for forked processes
-	process_blocks(&gblock, fd, result);
+	process_blocks(fd, result);
 	print_matrix(result, MATRIX_SIZE, "Result");
 	for (int i = 0; i < maxCores; i++) {
 		if (close(fd[i][0]) == -1) {
@@ -423,7 +327,7 @@ int main(int argc, char const **argv) {
 	wait_workers(); // not really required as all children have exited
 	gettimeofday(&end, NULL);
 	time_taken = getdetlatimeofday(&begin, &end);
-	print_stats(time_taken, &gblock);
+	print_stats(time_taken);
 
 	// validate the result and free the memory
 	gettimeofday(&begin, NULL);
