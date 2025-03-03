@@ -2,7 +2,7 @@ COMPILER_OPTS = -g -O3 -Wall -Werror
 LIBRARY_OPTS = -lm -lc
 CC = gcc
 
-all: pipe shmem
+all: pipe pipe-normal shmem shmem-normal
 
 pipe: IPC-pipe.c
 	$(CC) IPC-pipe.c -o pipe $(LIBRARY_OPTS) $(COMPILER_OPTS)
