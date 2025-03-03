@@ -1,4 +1,4 @@
-COMPILER_OPTS = -g -O2 -Wall -Werror
+COMPILER_OPTS = -g -O3 -Wall -Werror
 LIBRARY_OPTS = -lm -lc
 CC = gcc
 
@@ -9,6 +9,5 @@ pipe: IPC-pipe.c
 
 shmem: IPC-shmem.c
 	$(CC) IPC-shmem.c -o shmem $(LIBRARY_OPTS) $(COMPILER_OPTS)
-
 clean:
 	rm -f pipe shmem
