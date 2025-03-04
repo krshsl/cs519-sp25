@@ -168,7 +168,7 @@ def main():
     matrix_sizes = [32, 128, 512, 1024, 2048, 4096, 8192, 10000]
     core_counts = [2, 4, 8, 16, 32, 48, 64, 96]
     methods = ["pipe", "shmem"]
-    runs_per_test = 50
+    runs_per_test = 25
     
     # Run tests and collect results
     all_results = []

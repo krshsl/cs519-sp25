@@ -28,9 +28,9 @@
 #define MAX_VALUE (MATRIX_SIZE < 1024 ? 2048 : \
 				 (MATRIX_SIZE < 4096 ? 1024 : \
 				 (MATRIX_SIZE <= 8192 ? 512 : 128)))
-#define MAX_CORES 32
+#define MAX_CORES 40
 #define IS_VALIDATE_MATRIX 1
-#define VALIDATE_MAX_SIZE 2048
+#define VALIDATE_MAX_SIZE 10000
 #define PRINT_CAP 4
 
 #define MINF(X, Y) (((X) < (Y)) ? (X) : (Y))
@@ -164,7 +164,9 @@ void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], int id) 
 		for (int k = 0; k < MATRIX_SIZE; k++) {
 			float m1 = matrix1[i][k];
 			for (int j = 0; j < MATRIX_SIZE; j++) {
-				block_buf[j] += m1 * matrix2[k][j];
+				float m2 = matrix2[k][j];
+				volatile float m3 = m1*m2;
+				block_buf[j] += m3;
 			}
 		}
 

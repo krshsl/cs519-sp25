@@ -26,9 +26,9 @@
 #define MAX_VALUE (MATRIX_SIZE < 1024 ? 2048 : \
 				 (MATRIX_SIZE < 4096 ? 1024 : \
 				 (MATRIX_SIZE <= 8192 ? 512 : 4)))
-#define MAX_CORES 32
+#define MAX_CORES 40
 #define IS_VALIDATE_MATRIX 1
-#define VALIDATE_MAX_SIZE 2048
+#define VALIDATE_MAX_SIZE 10000
 #define PRINT_CAP 4
 
 #define MINF(X, Y) (((X) < (Y)) ? (X) : (Y))
@@ -162,7 +162,8 @@ void child_worker(float **matrix1, float **matrix2, float *result, int id) {
 			size_t pos = i*MATRIX_SIZE;
 			float m1 = matrix1[i][k];
 			for (int j = 0; j < MATRIX_SIZE; j++, pos++) {
-				result[pos] += m1 * matrix2[k][j];
+				float m2 = matrix2[k][j];
+				result[pos] += m1 * m2;
 			}
 		}
 	}
