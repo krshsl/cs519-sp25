@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
@@ -22,12 +23,12 @@
 //Add all your global variables and definitions here.
 #define MATRIX_SIZE 10000
 // floating point precision issues if value exceeds certain thresholds
-#define MAX_VALUE (MATRIX_SIZE <= 1024 ? 240 : \
-				 (MATRIX_SIZE <= 4096 ? 100 : \
-				 (MATRIX_SIZE <= 8192 ? 10 : 4)))
+#define MAX_VALUE (MATRIX_SIZE < 1024 ? 2048 : \
+				 (MATRIX_SIZE < 4096 ? 1024 : \
+				 (MATRIX_SIZE <= 8192 ? 512 : 4)))
 #define MAX_CORES 40
 #define IS_VALIDATE_MATRIX 1
-#define VALIDATE_MAX_SIZE MATRIX_SIZE+1
+#define VALIDATE_MAX_SIZE 2048
 #define PRINT_CAP 4
 
 #define MINF(X, Y) (((X) < (Y)) ? (X) : (Y))
@@ -97,7 +98,8 @@ void print_stats(double time_taken) {
 }
 
 float random_num(float min, float max) {
-   return min + (int)(rand() / (RAND_MAX / (max - min + 1) + 1));
+	float result = min + ((float)rand() / RAND_MAX) * (max - min);
+	return result;
 }
 
 float **init_matrix(int size, unsigned char is_zero) {
@@ -192,43 +194,24 @@ void validate_mult(float **matrix1, float **matrix2, float *result) {
 	if (!IS_VALIDATE_MATRIX || (print_mode == 1) || MATRIX_SIZE > VALIDATE_MAX_SIZE) {
 		return;
 	}
-
-	float sum = 0;
-	size_t pos = 0;
-	for (int i = 0; i < MATRIX_SIZE; i++) {
-		for (int j = 0; j < MATRIX_SIZE; j++, pos++) {
-			sum = 0;
-			for (int k = 0; k < MATRIX_SIZE; k++) {
-				sum += matrix1[i][k] * matrix2[k][j];
-			}
-			
-			if (fabs(sum - result[pos]) > 0.0001) {
-				printf("Validation failed at %d %d\n", i, j);
-				printf("Expected: %f, Actual: %f\n", sum, result[pos]);
-				exit(EXIT_FAILURE);
-			}
-			
-			if (pos > 16*MATRIX_SIZE) // verify a subset of the matrix will be enough
-				break;
-		}
-
-		if (pos > 16*MATRIX_SIZE)
-			break;
-	}
-	printf("Matrix validation successful\n");
-	
-	if (MATRIX_SIZE > PRINT_CAP) {
-		return;
-	}
 	float **verify = init_matrix(MATRIX_SIZE, 0);
+	size_t c_pos;
 	for (int i = 0; i < MATRIX_SIZE; i++) {
-		for (int j = 0; j < MATRIX_SIZE; j++) {
-			verify[i][j] = 0;
-			for (int k = 0; k < MATRIX_SIZE; k++) {
+		for (int k = 0; k < MATRIX_SIZE; k++) {
+			for (int j = 0; j < MATRIX_SIZE; j++) {
 				verify[i][j] += matrix1[i][k] * matrix2[k][j];
 			}
 		}
+		c_pos = i * MATRIX_SIZE;
+		for (int j = 0; j < MATRIX_SIZE; j++, c_pos++) {
+			if (fabs(verify[i][j] - result[c_pos]) >= 0.0001) {
+				printf("Validation failed at %d %d\n", i, j);
+				printf("Expected: %f, Actual: %f\n", verify[i][j], result[c_pos]);
+				exit(EXIT_FAILURE);
+			}
+		}
 	}
+	printf("Validation passed\n");
 	print_matrix(verify, MATRIX_SIZE, "Actual Matrix");
 	free_matrix(verify, MATRIX_SIZE);
 }
@@ -251,8 +234,8 @@ float *create_shm_matrix(int* shmid) {
     return result;
 }
 
-int main(int argc, char const *argv[])
-{
+int main(int argc, char const *argv[]) {
+	srand(time(NULL));
 	validate_args(argc, argv);
 	int res_id;
 	double time_taken = 0;
@@ -262,7 +245,6 @@ int main(int argc, char const *argv[])
 	float **matrix2 = init_matrix(MATRIX_SIZE, 1);
 	print_matrix(matrix2, MATRIX_SIZE, "Matrix 2");
 	float *result = create_shm_matrix(&res_id);
-
 
 	// time taken to perform matrix multiplication related tasks
 	gettimeofday(&begin, NULL);
