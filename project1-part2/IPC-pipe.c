@@ -28,7 +28,7 @@
 #define MAX_VALUE (MATRIX_SIZE < 1024 ? 2048 : \
 				 (MATRIX_SIZE < 4096 ? 1024 : \
 				 (MATRIX_SIZE <= 8192 ? 512 : 128)))
-#define MAX_CORES 10
+#define MAX_CORES 32
 #define IS_VALIDATE_MATRIX 1
 #define VALIDATE_MAX_SIZE 2048
 #define PRINT_CAP 4
@@ -157,11 +157,14 @@ void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], int id) 
 	float block_buf[MATRIX_SIZE];
 	size_t size = MATRIX_SIZE * sizeof(float);
 	for (int i = id; i < MATRIX_SIZE; i+=maxCores) {
-		memset((void*)block_buf, 0, size);
 		for (int k = 0; k < MATRIX_SIZE; k++) {
+			block_buf[k] *= 0.0;
+		}
+		
+		for (int k = 0; k < MATRIX_SIZE; k++) {
+			float m1 = matrix1[i][k];
 			for (int j = 0; j < MATRIX_SIZE; j++) {
-				volatile float val = matrix1[i][k] * matrix2[k][j];
-				block_buf[j] += val;
+				block_buf[j] += m1 * matrix2[k][j];
 			}
 		}
 
@@ -254,8 +257,9 @@ void validate_mult(float **matrix1, float **matrix2, float **result) {
 	float **verify = init_matrix(MATRIX_SIZE, 0);
 	for (int i = 0; i < MATRIX_SIZE; i++) {
 		for (int k = 0; k < MATRIX_SIZE; k++) {
+			float m1 = matrix1[i][k];
 			for (int j = 0; j < MATRIX_SIZE; j++) {
-				verify[i][j] += matrix1[i][k] * matrix2[k][j];
+				verify[i][j] += m1 * matrix2[k][j];
 			}
 		}
 

@@ -26,7 +26,7 @@
 #define MAX_VALUE (MATRIX_SIZE < 1024 ? 2048 : \
 				 (MATRIX_SIZE < 4096 ? 1024 : \
 				 (MATRIX_SIZE <= 8192 ? 512 : 4)))
-#define MAX_CORES 40
+#define MAX_CORES 32
 #define IS_VALIDATE_MATRIX 1
 #define VALIDATE_MAX_SIZE 2048
 #define PRINT_CAP 4
@@ -157,12 +157,12 @@ void free_matrix(float **matrix, int size) {
 
 void child_worker(float **matrix1, float **matrix2, float *result, int id) {
 	// printf("Child %d::%d started\n", id, getpid());
-	size_t pos;
 	for (int i = id; i < MATRIX_SIZE; i+=maxCores) {
 		for (int k = 0; k < MATRIX_SIZE; k++) {
-			pos = i*MATRIX_SIZE;
+			size_t pos = i*MATRIX_SIZE;
+			float m1 = matrix1[i][k];
 			for (int j = 0; j < MATRIX_SIZE; j++, pos++) {
-				result[pos] += matrix1[i][k] * matrix2[k][j];
+				result[pos] += m1 * matrix2[k][j];
 			}
 		}
 	}
@@ -198,8 +198,9 @@ void validate_mult(float **matrix1, float **matrix2, float *result) {
 	size_t c_pos;
 	for (int i = 0; i < MATRIX_SIZE; i++) {
 		for (int k = 0; k < MATRIX_SIZE; k++) {
+			float m1 = matrix1[i][k];
 			for (int j = 0; j < MATRIX_SIZE; j++) {
-				verify[i][j] += matrix1[i][k] * matrix2[k][j];
+				verify[i][j] += m1 * matrix2[k][j];
 			}
 		}
 		c_pos = i * MATRIX_SIZE;
