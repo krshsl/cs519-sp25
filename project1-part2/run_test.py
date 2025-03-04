@@ -117,7 +117,7 @@ def generate_cpu_utilization_plots(df):
     sns.set(style="darkgrid")
     
     # Calculate CPU utilization
-    df['CPUUtilization'] = (df['UserTime'] + df['SysTime']) / (df['RealTime'] * df['Cores']) * 100
+    df['CPUUtilization'] = (df['UserTime'] + df['SysTime'] + df['TimeTaken'] - df['RealTime']) / (df['TimeTaken'] * df['Cores']) * 100
     
     for method in df['Method'].unique():
         plt.figure(figsize=(12, 8))
@@ -168,7 +168,7 @@ def main():
     matrix_sizes = [32, 128, 512, 1024, 2048, 4096, 8192, 10000]
     core_counts = [2, 4, 8, 16, 32, 48, 64, 96]
     methods = ["pipe", "shmem"]
-    runs_per_test = 25
+    runs_per_test = 50
     
     # Run tests and collect results
     all_results = []
