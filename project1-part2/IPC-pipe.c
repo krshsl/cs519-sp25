@@ -24,7 +24,7 @@
 #include <sys/wait.h>
 
 //Add all your global variables and definitions here.
-#define MATRIX_SIZE 8192
+#define MATRIX_SIZE 10000
 #define MAX_VALUE (MATRIX_SIZE < 1024 ? 2048 : \
 				 (MATRIX_SIZE < 4096 ? 1024 : \
 				 (MATRIX_SIZE <= 8192 ? 512 : 128)))
@@ -37,7 +37,7 @@
 #define MAXF(X, Y) (((X) > (Y)) ? (X) : (Y))
 
 int maxCores = 0; // hard limit to not exceed total matrix elements
-char print_mode = 0; // print in csv format for easy parsing
+int print_mode = 0; // print in csv format for easy parsing
 
 void validate_args(int argc, char const **argv);
 double getdetlatimeofday(struct timeval *begin, struct timeval *end);
@@ -93,7 +93,7 @@ double getdetlatimeofday(struct timeval *begin, struct timeval *end) {
  * to provide.
  */
 void print_stats(double time_taken) {
-	if (print_mode == 1) {
+	if (print_mode) {
 		printf("%d,%d,pipe,%f\n", MATRIX_SIZE, maxCores, time_taken);
 		return;
 	}
@@ -248,7 +248,7 @@ void process_blocks(int fd[maxCores][2], float **result) {
 }
 
 void validate_mult(float **matrix1, float **matrix2, float **result) {
-	if (!IS_VALIDATE_MATRIX || (print_mode == 1) || MATRIX_SIZE > VALIDATE_MAX_SIZE) {
+	if (!IS_VALIDATE_MATRIX || print_mode || MATRIX_SIZE > VALIDATE_MAX_SIZE) {
 		return;
 	}
 	float **verify = init_matrix(MATRIX_SIZE, 0);

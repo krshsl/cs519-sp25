@@ -35,7 +35,7 @@
 #define MAXF(X, Y) (((X) > (Y)) ? (X) : (Y))
 
 int maxCores = MINF(MATRIX_SIZE, MAX_CORES); // hard limit to not size of matrix
-char print_mode = 0; // print in csv format for easy parsing
+int print_mode = 0; // print in csv format for easy parsing
 
 void validate_args(int argc, char const **argv);
 double getdetlatimeofday(struct timeval *begin, struct timeval *end);
@@ -87,7 +87,7 @@ double getdetlatimeofday(struct timeval *begin, struct timeval *end) {
  * to provide.
  */
 void print_stats(double time_taken) {
-	if (print_mode == 1) {
+	if (print_mode) {
 		printf("%d,%d,shmem,%f\n", MATRIX_SIZE, maxCores, time_taken);
 		return;
 	}
@@ -191,7 +191,7 @@ void wait_workers() {
 }
 
 void validate_mult(float **matrix1, float **matrix2, float *result) {
-	if (!IS_VALIDATE_MATRIX || (print_mode == 1) || MATRIX_SIZE > VALIDATE_MAX_SIZE) {
+	if (!IS_VALIDATE_MATRIX || print_mode || MATRIX_SIZE > VALIDATE_MAX_SIZE) {
 		return;
 	}
 	float **verify = init_matrix(MATRIX_SIZE, 0);

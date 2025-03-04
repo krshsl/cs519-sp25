@@ -12,7 +12,7 @@ def compile_and_run(method, matrix_size, cores, runs_per_test):
     results = []
     source_file = f"IPC-{method}.c"
     
-    if (matrix_size >= 4096 and cores <= 5):
+    if (matrix_size >= 4096 and cores <= 16):
         print(f"Skipping {method} with matrix size {matrix_size} and cores {cores}")
         return results
     
@@ -165,12 +165,10 @@ def generate_perf_plots():
 def main():
     """Main function to execute the benchmark tests."""
     # Parameters
-    # matrix_sizes = [32, 128, 512, 1024, 2048, 4096, 8192, 10000]
-    matrix_sizes = [8192, 10000]
-    # core_counts = [2, 4, 8, 16, 32, 48, 64, 96]
-    core_counts = [10, 20, 40]
+    matrix_sizes = [32, 128, 512, 1024, 2048, 4096, 8192, 10000]
+    core_counts = [2, 4, 8, 16, 32, 48, 64, 96]
     methods = ["pipe", "shmem"]
-    runs_per_test = 2
+    runs_per_test = 25
     
     # Run tests and collect results
     all_results = []
