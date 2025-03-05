@@ -156,15 +156,16 @@ void init_pipes(int fd[maxCores][2]) {
 void matrix_mult(float **matrix1, float **matrix2, float **result, int fd[maxCores][2], int id) {
 	size_t size = MATRIX_SIZE * sizeof(float);
 	for (int i = id; i < MATRIX_SIZE; i+=maxCores) {
+		float *r = result[i];
 		for (int k = 0; k < MATRIX_SIZE; k++) {
 			float m1 = matrix1[i][k];
 			for (int j = 0; j < MATRIX_SIZE; j++) {
 				float m2 = matrix2[k][j];
-				result[i][j] += m1*m2;
+				r[j] += m1*m2;
 			}
 		}
 
-		void *buffer = (void*)result[i];
+		void *buffer = (void*)r;
 		ssize_t bytes_written = write(fd[id][1], buffer, size);
 		while (bytes_written < size) {
 			bytes_written += write(fd[id][1], buffer + bytes_written, MATRIX_SIZE - bytes_written);
