@@ -12,7 +12,7 @@ def compile_and_run(method, matrix_size, cores, runs_per_test):
     results = []
     source_file = f"IPC-{method}.c"
     
-    if (matrix_size > 4096 and cores <= 16):
+    if (matrix_size > 4096 and cores <= 8):
         print(f"Skipping {method} with matrix size {matrix_size} and cores {cores}")
         return results
     

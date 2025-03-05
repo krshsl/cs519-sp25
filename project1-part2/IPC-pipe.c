@@ -48,9 +48,9 @@ float **init_matrix(int size, unsigned char is_zero);
 void print_matrix(float **matrix, int size, const char *msg);
 void free_matrix(float **matrix, int size);
 void init_pipes(int fd[maxCores][2]);
-void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], int id);
-void init_workers(float **matrix1, float **matrix2, int fd[maxCores][2]);
-void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], int id);
+void matrix_mult(float **matrix1, float **matrix2, float **result, int fd[maxCores][2], int id);
+void init_workers(float **matrix1, float **matrix2, float **result, int fd[maxCores][2]);
+void child_worker(float **matrix1, float **matrix2, float **result, int fd[maxCores][2], int id);
 void process_blocks(int fd[maxCores][2], float **result);
 void validate_mult(float **matrix1, float **matrix2, float **result);
 
@@ -153,24 +153,18 @@ void init_pipes(int fd[maxCores][2]) {
 	}
 }
 
-void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], int id) {
-	float block_buf[MATRIX_SIZE];
+void matrix_mult(float **matrix1, float **matrix2, float **result, int fd[maxCores][2], int id) {
 	size_t size = MATRIX_SIZE * sizeof(float);
 	for (int i = id; i < MATRIX_SIZE; i+=maxCores) {
-		for (int k = 0; k < MATRIX_SIZE; k++) {
-			block_buf[k] *= 0.0;
-		}
-		
 		for (int k = 0; k < MATRIX_SIZE; k++) {
 			float m1 = matrix1[i][k];
 			for (int j = 0; j < MATRIX_SIZE; j++) {
 				float m2 = matrix2[k][j];
-				volatile float m3 = m1*m2;
-				block_buf[j] += m3;
+				result[i][j] += m1*m2;
 			}
 		}
 
-		void *buffer = (void*)block_buf;
+		void *buffer = (void*)result[i];
 		ssize_t bytes_written = write(fd[id][1], buffer, size);
 		while (bytes_written < size) {
 			bytes_written += write(fd[id][1], buffer + bytes_written, MATRIX_SIZE - bytes_written);
@@ -186,7 +180,7 @@ void matrix_mult(float **matrix1, float **matrix2, int fd[maxCores][2], int id) 
 	}
 }
 
-void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], int id) {
+void child_worker(float **matrix1, float **matrix2, float **result, int fd[maxCores][2], int id) {
 	// printf("Child %d::%d started\n", id, getpid());
 	for (int i = 0; i < maxCores; i++) {
 		if (i != id) {
@@ -200,7 +194,7 @@ void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], int id)
 			exit(EXIT_FAILURE);
 		}
 	}
-	matrix_mult(matrix1, matrix2, fd, id);
+	matrix_mult(matrix1, matrix2, result, fd, id);
 	if(close(fd[id][1]) == -1) {
 		perror("close write failed - child");
 		exit(EXIT_FAILURE);
@@ -209,7 +203,7 @@ void child_worker(float **matrix1, float **matrix2, int fd[maxCores][2], int id)
 	exit(0);
 }
 
-void init_workers(float **matrix1, float **matrix2, int fd[maxCores][2]) {
+void init_workers(float **matrix1, float **matrix2, float **result, int fd[maxCores][2]) {
 	pid_t pid;
 	for (int i = 0; i < maxCores; i++) {
 		pid = fork();
@@ -218,7 +212,7 @@ void init_workers(float **matrix1, float **matrix2, int fd[maxCores][2]) {
             perror("fork failed");
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
-			child_worker(matrix1, matrix2, fd, i);
+			child_worker(matrix1, matrix2, result, fd, i);
 		}
 	}
 }
@@ -287,19 +281,19 @@ int main(int argc, char const **argv) {
 	print_matrix(matrix1, MATRIX_SIZE, "Matrix 1");
 	float **matrix2 = init_matrix(MATRIX_SIZE, 1);
 	print_matrix(matrix2, MATRIX_SIZE, "Matrix 2");
+	float **result = init_matrix(MATRIX_SIZE, 0);
 	int fd[maxCores][2];
 	
 	// time taken to perform matrix multiplication related tasks
 	gettimeofday(&begin, NULL);
 	init_pipes(fd);
-	init_workers(matrix1, matrix2, fd);
+	init_workers(matrix1, matrix2, result, fd);
 	for (int i = 0; i < maxCores; i++) {
 		if (close(fd[i][1]) == -1) {
 			perror("close write failed - parent");
 			exit(EXIT_FAILURE);
 		}
 	}
-	float **result = init_matrix(MATRIX_SIZE, 0); // avoiding init at start to save some memory for forked processes
 	process_blocks(fd, result);
 	print_matrix(result, MATRIX_SIZE, "Result");
 	for (int i = 0; i < maxCores; i++) {
@@ -322,25 +316,3 @@ int main(int argc, char const **argv) {
 	free_matrix(result, MATRIX_SIZE);
 	return 0;
 }
-
-/*
-stats::
-
-5000,10,pipe,25.457986
-26.56,189.94,5.26
-
-5000,20,pipe,15.624162
-16.72,288.25,4.53
-
-5000,40,pipe,10.022775
-11.12,264.44,6.73
-
-4000,40,pipe,4.799979
-5.50,137.02,3.59
-
-4000,20,pipe,7.988943
-8.69,147.94,2.56
-
-4000,10,pipe,12.925466
-13.62,96.93,2.34
-*/
