@@ -1,6 +1,9 @@
 /* CS 519, Spring 2025: Project 1 - Part 2
  * IPC using shared memory to perform matrix multiplication.
  * Feel free to extend or change any code or functions below.
+ * 
+ * use following command to get approx performance stats:
+ * make && /usr/bin/time -f "%e,%U,%S" -q ./pipe -p
  */
 #define _GNU_SOURCE
 #include <err.h>
