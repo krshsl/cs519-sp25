@@ -311,7 +311,7 @@ def main():
     # Save results and generate summary
     save_results(df)
     
-    Generate performance plots
+    # Generate performance plots
     generate_perf_plots()
 
 if __name__ == "__main__":
