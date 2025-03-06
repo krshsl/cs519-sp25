@@ -29,7 +29,7 @@
 #define MAX_VALUE (MATRIX_SIZE < 1024 ? 2048 : \
 				 (MATRIX_SIZE < 4096 ? 1024 : \
 				 (MATRIX_SIZE <= 8192 ? 512 : 4)))
-#define MAX_CORES 40
+#define MAX_CORES 16
 #define IS_VALIDATE_MATRIX 1
 #define VALIDATE_MAX_SIZE 10000
 #define PRINT_CAP 4
@@ -160,11 +160,62 @@ void free_matrix(float **matrix, int size) {
 
 void child_worker(float **matrix1, float **matrix2, float *result, int id) {
 	// printf("Child %d::%d started\n", id, getpid());
+	int end = MATRIX_SIZE/8;
 	for (int i = id; i < MATRIX_SIZE; i+=maxCores) {
-		for (int k = 0; k < MATRIX_SIZE; k++) {
+		int k = 0;
+		for (; k < end; k+= 8) {
+			size_t pos = i*MATRIX_SIZE;
+			float m1 = matrix1[i][k] + matrix1[i][k+1] + matrix1[i][k+2] + matrix1[i][k+3] + matrix1[i][k+4] + matrix1[i][k+5] + matrix1[i][k+6] + matrix1[i][k+7];
+			int j = 0;
+			for (; j < end; j+=8, pos+=8) {
+				float m21 = matrix2[k][j];
+				float m22 = matrix2[k][j+1];
+				float m23 = matrix2[k][j+2];
+				float m24 = matrix2[k][j+3];
+				float m25 = matrix2[k][j+4];
+				float m26 = matrix2[k][j+5];
+				float m27 = matrix2[k][j+6];
+				float m28 = matrix2[k][j+7];
+				result[pos] += m1 * m21;
+				result[pos+1] += m1 * m22;
+				result[pos+2] += m1 * m23;
+				result[pos+3] += m1 * m24;
+				result[pos+4] += m1 * m25;
+				result[pos+5] += m1 * m26;
+				result[pos+6] += m1 * m27;
+				result[pos+7] += m1 * m28;
+			}
+
+			for (; j < MATRIX_SIZE; j++, pos++) {
+				float m2 = matrix2[k][j];
+				result[pos] += m1 * m2;
+			}
+		}
+
+		for (; k < MATRIX_SIZE; k++) {
 			size_t pos = i*MATRIX_SIZE;
 			float m1 = matrix1[i][k];
-			for (int j = 0; j < MATRIX_SIZE; j++, pos++) {
+			int j = 0;
+			for (; j < end; j+=8, pos+=8) {
+				float m21 = matrix2[k][j];
+				float m22 = matrix2[k][j+1];
+				float m23 = matrix2[k][j+2];
+				float m24 = matrix2[k][j+3];
+				float m25 = matrix2[k][j+4];
+				float m26 = matrix2[k][j+5];
+				float m27 = matrix2[k][j+6];
+				float m28 = matrix2[k][j+7];
+				result[pos] += m1 * m21;
+				result[pos+1] += m1 * m22;
+				result[pos+2] += m1 * m23;
+				result[pos+3] += m1 * m24;
+				result[pos+4] += m1 * m25;
+				result[pos+5] += m1 * m26;
+				result[pos+6] += m1 * m27;
+				result[pos+7] += m1 * m28;
+			}
+
+			for (;j < MATRIX_SIZE; j++, pos++) {
 				float m2 = matrix2[k][j];
 				result[pos] += m1 * m2;
 			}
@@ -200,11 +251,65 @@ void validate_mult(float **matrix1, float **matrix2, float *result) {
 	}
 	float **verify = init_matrix(MATRIX_SIZE, 0);
 	size_t c_pos;
+	int end = MATRIX_SIZE/8;
 	for (int i = 0; i < MATRIX_SIZE; i++) {
-		for (int k = 0; k < MATRIX_SIZE; k++) {
+		float *r = verify[i];
+		int k = 0;
+		for (; k < end; k+= 8) {
+			size_t pos = 0;
+			float m1 = matrix1[i][k] + matrix1[i][k+1] + matrix1[i][k+2] + matrix1[i][k+3] + matrix1[i][k+4] + matrix1[i][k+5] + matrix1[i][k+6] + matrix1[i][k+7];
+			int j = 0;
+			for (; j < end; j+=8, pos+=8) {
+				float m21 = matrix2[k][j];
+				float m22 = matrix2[k][j+1];
+				float m23 = matrix2[k][j+2];
+				float m24 = matrix2[k][j+3];
+				float m25 = matrix2[k][j+4];
+				float m26 = matrix2[k][j+5];
+				float m27 = matrix2[k][j+6];
+				float m28 = matrix2[k][j+7];
+				r[pos] += m1 * m21;
+				r[pos+1] += m1 * m22;
+				r[pos+2] += m1 * m23;
+				r[pos+3] += m1 * m24;
+				r[pos+4] += m1 * m25;
+				r[pos+5] += m1 * m26;
+				r[pos+6] += m1 * m27;
+				r[pos+7] += m1 * m28;
+			}
+
+			for (; j < MATRIX_SIZE; j++, pos++) {
+				float m2 = matrix2[k][j];
+				r[pos] += m1 * m2;
+			}
+		}
+
+		for (; k < MATRIX_SIZE; k++) {
+			size_t pos = 0;
 			float m1 = matrix1[i][k];
-			for (int j = 0; j < MATRIX_SIZE; j++) {
-				verify[i][j] += m1 * matrix2[k][j];
+			int j = 0;
+			for (; j < end; j+=8, pos+=8) {
+				float m21 = matrix2[k][j];
+				float m22 = matrix2[k][j+1];
+				float m23 = matrix2[k][j+2];
+				float m24 = matrix2[k][j+3];
+				float m25 = matrix2[k][j+4];
+				float m26 = matrix2[k][j+5];
+				float m27 = matrix2[k][j+6];
+				float m28 = matrix2[k][j+7];
+				r[pos] += m1 * m21;
+				r[pos+1] += m1 * m22;
+				r[pos+2] += m1 * m23;
+				r[pos+3] += m1 * m24;
+				r[pos+4] += m1 * m25;
+				r[pos+5] += m1 * m26;
+				r[pos+6] += m1 * m27;
+				r[pos+7] += m1 * m28;
+			}
+
+			for (;j < MATRIX_SIZE; j++, pos++) {
+				float m2 = matrix2[k][j];
+				r[pos] += m1 * m2;
 			}
 		}
 		c_pos = i * MATRIX_SIZE;
