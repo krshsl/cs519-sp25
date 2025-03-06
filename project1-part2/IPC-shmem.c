@@ -227,13 +227,13 @@ float *create_shm_matrix(int* shmid) {
     
 	if (*shmid == -1) {
         perror("shmget data");
-        return NULL;
+        exit(EXIT_FAILURE);
     }
     float *result = (float*)shmat(*shmid, NULL, 0);
 
     if (result == (void *)-1) {
         perror("shmat data");
-        return NULL;
+        exit(EXIT_FAILURE);
     }
     memset(result, 0, size);
     return result;
