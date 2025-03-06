@@ -12,10 +12,6 @@ def compile_and_run(method, matrix_size, cores, runs_per_test):
     results = []
     source_file = f"IPC-{method}.c"
     
-    if (matrix_size > 4096 and cores <= 8):
-        print(f"Skipping {method} with matrix size {matrix_size} and cores {cores}")
-        return results
-    
     # Update source file
     with open(source_file, 'r') as f:
         content = f.read()
@@ -154,7 +150,7 @@ def generate_cpu_utilization_plots(df):
     
     for method in df['Method'].unique():
         # Small matrices (below 8192)
-        small_data = df[(df['Method'] == method) & (df['MatrixSize'] < 8192)]
+        small_data = df[(df['Method'] == method) & (df['MatrixSize'] < 8192) & (df['Cores'] <= 40)]
         if not small_data.empty:
             plt.figure(figsize=(12, 8))
             
@@ -178,7 +174,7 @@ def generate_cpu_utilization_plots(df):
             print(f"Created CPU utilization graph for {method} method with small matrices (saved as {method}_small_matrix_cpu_utilization.png)")
         
         # Large matrices (8192 and above)
-        large_data = df[(df['Method'] == method) & (df['MatrixSize'] >= 8192)]
+        large_data = df[(df['Method'] == method) & (df['MatrixSize'] >= 8192) & (df['Cores'] <= 40)]
         if not large_data.empty:
             plt.figure(figsize=(12, 8))
             
@@ -205,14 +201,14 @@ def generate_cpu_utilization_plots(df):
 
 def generate_additional_plots(df, summary_df, matrix, key):
     """Generate additional plots for better analysis of matrices."""
-    # Filter for large matrices
-    large_matrix_df = df[df['MatrixSize'].isin(matrix)]
+    matrix_df = df[df['MatrixSize'].isin(matrix)]
+    matrix_df = matrix_df[matrix_df['Cores'] <= 40]
     
     plt.figure(figsize=(12, 8))
-    for method in large_matrix_df['Method'].unique():
-        for size in large_matrix_df[large_matrix_df['Method'] == method]['MatrixSize'].unique():
-            method_size_data = large_matrix_df[(large_matrix_df['Method'] == method) & 
-                                                (large_matrix_df['MatrixSize'] == size)]
+    for method in matrix_df['Method'].unique():
+        for size in matrix_df[matrix_df['Method'] == method]['MatrixSize'].unique():
+            method_size_data = matrix_df[(matrix_df['Method'] == method) & 
+                                                (matrix_df['MatrixSize'] == size)]
             if method_size_data.empty:
                 continue
                 
@@ -229,8 +225,8 @@ def generate_additional_plots(df, summary_df, matrix, key):
             
             plt.plot(cores, speedups, marker='o', label=f"{method.upper()} - {size}")
     
-    max_cores = large_matrix_df['Cores'].max()
-    min_cores = large_matrix_df['Cores'].min()
+    max_cores = matrix_df['Cores'].max()
+    min_cores = matrix_df['Cores'].min()
     if min_cores > 0:
         ideal = [c/min_cores for c in range(min_cores, max_cores+1)]
         plt.plot(range(min_cores, max_cores+1), ideal, 'k--', label='Ideal Linear Speedup')
@@ -244,8 +240,9 @@ def generate_additional_plots(df, summary_df, matrix, key):
     plt.savefig(f'images/{key}_matrices_speedup.png', bbox_inches='tight')
     print(f"Created speedup analysis plot for {key} matrices")
     
+    matrix_df = df[df['MatrixSize'].isin(matrix)]
     for size in matrix:
-        size_data = large_matrix_df[large_matrix_df['MatrixSize'] == size]
+        size_data = matrix_df[matrix_df['MatrixSize'] == size]
         if size_data.empty:
             continue
             
@@ -314,7 +311,7 @@ def main():
     # Save results and generate summary
     save_results(df)
     
-    # Generate performance plots
+    Generate performance plots
     generate_perf_plots()
 
 if __name__ == "__main__":
