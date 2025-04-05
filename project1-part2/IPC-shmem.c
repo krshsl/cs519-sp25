@@ -3,7 +3,11 @@
  * Feel free to extend or change any code or functions below.
  * 
  * use following command to get approx performance stats:
- * make && /usr/bin/time -f "%e,%U,%S" -q ./pipe -p
+ * make && /usr/bin/time -f "%e,%U,%S" -q ./shmem -p
+ * 
+ * Please make sure to run the following commands to make the program faster!
+ * sudo echo "#kernel shmmni increased for shmem implementation" >> /etc/sysctl.conf
+ * sudo echo "kernel.shmmni=16384" >> /etc/sysctl.conf
  */
 #define _GNU_SOURCE
 #include <err.h>
@@ -46,13 +50,15 @@ void print_stats(double time_taken);
 
 float random_num(float min, float max);
 float **init_matrix(int size, unsigned char is_zero);
-float *create_shm_matrix(int* shmid);
+float *create_shm_rows(int *shmid);
+float **create_shm_matrix(int *shmid, int *shmids);
+void free_shm_matrix(float **matrix, int shmid, int *shmids);
 void print_matrix(float **matrix, int size, const char *msg);
-void print_result(float *matrix, int size, const char *msg);
+void print_result(float **matrix, int size, const char *msg);
 void free_matrix(float **matrix, int size);
-void init_workers(float **matrix1, float **matrix2, float *result);
-void child_worker(float **matrix1, float **matrix2, float *result, int id);
-void validate_mult(float **matrix1, float **matrix2, float *result);
+void init_workers(float **matrix1, float **matrix2, float **result);
+void child_worker(float **matrix1, float **matrix2, float **result, int id);
+void validate_mult(float **matrix1, float **matrix2, float **result);
 
 void validate_args(int argc, char const **argv) {
 	if (MATRIX_SIZE <= 0) {
@@ -135,17 +141,16 @@ void print_matrix(float **matrix, int size, const char *msg) {
 	}
 }
 
-void print_result(float *matrix, int size, const char *msg) {
+void print_result(float **matrix, int size, const char *msg) {
 	if (size > PRINT_CAP) {
 		return;
 	}
 
 	printf("%s\n", msg);
-	size_t pos;
 	for (int i = 0; i < size; i++) {
-		pos = i * size;
-		for (int j = 0; j < size; j++, pos++) {
-			printf("%f\t", matrix[pos]);
+		float *row = matrix[i];
+		for (int j = 0; j < size; j++) {
+			printf("%f\t", row[j]);
 		}
 		printf("\n");
 	}
@@ -158,13 +163,14 @@ void free_matrix(float **matrix, int size) {
 	free(matrix);
 }
 
-void child_worker(float **matrix1, float **matrix2, float *result, int id) {
+void child_worker(float **matrix1, float **matrix2, float **result, int id) {
 	// printf("Child %d::%d started\n", id, getpid());
 	int end = MATRIX_SIZE/8;
 	for (int i = id; i < MATRIX_SIZE; i+=maxCores) {
+		float *r = result[i];
 		int k = 0;
 		for (; k < end; k+= 8) {
-			size_t pos = i*MATRIX_SIZE;
+			size_t pos = 0;
 			float m1 = matrix1[i][k] + matrix1[i][k+1] + matrix1[i][k+2] + matrix1[i][k+3] + matrix1[i][k+4] + matrix1[i][k+5] + matrix1[i][k+6] + matrix1[i][k+7];
 			int j = 0;
 			for (; j < end; j+=8, pos+=8) {
@@ -176,24 +182,24 @@ void child_worker(float **matrix1, float **matrix2, float *result, int id) {
 				float m26 = matrix2[k][j+5];
 				float m27 = matrix2[k][j+6];
 				float m28 = matrix2[k][j+7];
-				result[pos] += m1 * m21;
-				result[pos+1] += m1 * m22;
-				result[pos+2] += m1 * m23;
-				result[pos+3] += m1 * m24;
-				result[pos+4] += m1 * m25;
-				result[pos+5] += m1 * m26;
-				result[pos+6] += m1 * m27;
-				result[pos+7] += m1 * m28;
+				r[pos] += m1 * m21;
+				r[pos+1] += m1 * m22;
+				r[pos+2] += m1 * m23;
+				r[pos+3] += m1 * m24;
+				r[pos+4] += m1 * m25;
+				r[pos+5] += m1 * m26;
+				r[pos+6] += m1 * m27;
+				r[pos+7] += m1 * m28;
 			}
 
 			for (; j < MATRIX_SIZE; j++, pos++) {
 				float m2 = matrix2[k][j];
-				result[pos] += m1 * m2;
+				r[pos] += m1 * m2;
 			}
 		}
 
 		for (; k < MATRIX_SIZE; k++) {
-			size_t pos = i*MATRIX_SIZE;
+			size_t pos = 0;
 			float m1 = matrix1[i][k];
 			int j = 0;
 			for (; j < end; j+=8, pos+=8) {
@@ -205,19 +211,19 @@ void child_worker(float **matrix1, float **matrix2, float *result, int id) {
 				float m26 = matrix2[k][j+5];
 				float m27 = matrix2[k][j+6];
 				float m28 = matrix2[k][j+7];
-				result[pos] += m1 * m21;
-				result[pos+1] += m1 * m22;
-				result[pos+2] += m1 * m23;
-				result[pos+3] += m1 * m24;
-				result[pos+4] += m1 * m25;
-				result[pos+5] += m1 * m26;
-				result[pos+6] += m1 * m27;
-				result[pos+7] += m1 * m28;
+				r[pos] += m1 * m21;
+				r[pos+1] += m1 * m22;
+				r[pos+2] += m1 * m23;
+				r[pos+3] += m1 * m24;
+				r[pos+4] += m1 * m25;
+				r[pos+5] += m1 * m26;
+				r[pos+6] += m1 * m27;
+				r[pos+7] += m1 * m28;
 			}
 
 			for (;j < MATRIX_SIZE; j++, pos++) {
 				float m2 = matrix2[k][j];
-				result[pos] += m1 * m2;
+				r[pos] += m1 * m2;
 			}
 		}
 	}
@@ -225,7 +231,7 @@ void child_worker(float **matrix1, float **matrix2, float *result, int id) {
 	exit(0);
 }
 
-void init_workers(float **matrix1, float **matrix2, float *result) {
+void init_workers(float **matrix1, float **matrix2, float **result) {
 	pid_t pid;
 	for (int i = 0; i < maxCores; i++) {
 		pid = fork();
@@ -245,12 +251,11 @@ void wait_workers() {
 	}
 }
 
-void validate_mult(float **matrix1, float **matrix2, float *result) {
+void validate_mult(float **matrix1, float **matrix2, float **result) {
 	if (!IS_VALIDATE_MATRIX || print_mode || MATRIX_SIZE > VALIDATE_MAX_SIZE) {
 		return;
 	}
 	float **verify = init_matrix(MATRIX_SIZE, 0);
-	size_t c_pos;
 	int end = MATRIX_SIZE/8;
 	for (int i = 0; i < MATRIX_SIZE; i++) {
 		float *r = verify[i];
@@ -312,11 +317,11 @@ void validate_mult(float **matrix1, float **matrix2, float *result) {
 				r[pos] += m1 * m2;
 			}
 		}
-		c_pos = i * MATRIX_SIZE;
-		for (int j = 0; j < MATRIX_SIZE; j++, c_pos++) {
-			if (fabs(verify[i][j] - result[c_pos]) >= 0.0001) {
+
+		for (int j = 0; j < MATRIX_SIZE; j++) {
+			if (fabs(verify[i][j] - result[i][j]) >= 0.0001) {
 				printf("Validation failed at %d %d\n", i, j);
-				printf("Expected: %f, Actual: %f\n", verify[i][j], result[c_pos]);
+				printf("Expected: %f, Actual: %f\n", verify[i][j], result[i][j]);
 				exit(EXIT_FAILURE);
 			}
 		}
@@ -326,35 +331,70 @@ void validate_mult(float **matrix1, float **matrix2, float *result) {
 	free_matrix(verify, MATRIX_SIZE);
 }
 
-float *create_shm_matrix(int* shmid) {
-    size_t size = sizeof(float) * MATRIX_SIZE * MATRIX_SIZE;
+float *create_shm_rows(int *shmid) {
+	size_t size = sizeof(float) * MATRIX_SIZE;
+	*shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0600);
+	
+	if (*shmid == -1) {
+		perror("shmget data");
+		exit(EXIT_FAILURE);
+	}
+	float *result = (float*)shmat(*shmid, NULL, 0);
+
+	if (result == (void *)-1) {
+		perror("shmat data");
+		exit(EXIT_FAILURE);
+	}
+	memset(result, 0, size);
+	return result;
+}
+
+float **create_shm_matrix(int *shmid, int *shmids) {
+    size_t size = sizeof(float*) * MATRIX_SIZE;
     *shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0600);
     
 	if (*shmid == -1) {
         perror("shmget data");
         exit(EXIT_FAILURE);
     }
-    float *result = (float*)shmat(*shmid, NULL, 0);
+    float **result = (float**)shmat(*shmid, NULL, 0);
+	for (int i = 0; i < MATRIX_SIZE; i++) {
+		shmids[i] = -1;
+		result[i] = create_shm_rows(&shmids[i]);
+	}
 
     if (result == (void *)-1) {
         perror("shmat data");
         exit(EXIT_FAILURE);
     }
-    memset(result, 0, size);
     return result;
+}
+
+void free_shm_matrix(float **matrix, int shmid, int *shmids) {
+	for (int i = 0; i < MATRIX_SIZE; i++) {
+		if (shmids[i] != -1) {
+			shmdt(matrix[i]);
+			shmctl(shmids[i], IPC_RMID, NULL);
+		}
+	}
+
+	if (shmid != -1) {
+		shmdt(matrix);
+		shmctl(shmid, IPC_RMID, NULL);
+	}
 }
 
 int main(int argc, char const *argv[]) {
 	srand(time(NULL));
 	validate_args(argc, argv);
-	int res_id;
+	int res_id, shm_ids[MATRIX_SIZE];
 	double time_taken = 0;
 	struct timeval begin, end;
 	float **matrix1 = init_matrix(MATRIX_SIZE, 1);
 	print_matrix(matrix1, MATRIX_SIZE, "Matrix 1");
 	float **matrix2 = init_matrix(MATRIX_SIZE, 1);
 	print_matrix(matrix2, MATRIX_SIZE, "Matrix 2");
-	float *result = create_shm_matrix(&res_id);
+	float **result = create_shm_matrix(&res_id, shm_ids);
 
 	// time taken to perform matrix multiplication related tasks
 	gettimeofday(&begin, NULL);
@@ -371,8 +411,7 @@ int main(int argc, char const *argv[]) {
 	gettimeofday(&end, NULL);
 	free_matrix(matrix1, MATRIX_SIZE);
 	free_matrix(matrix2, MATRIX_SIZE);
-    shmdt(result);
-    shmctl(res_id, IPC_RMID, NULL);
+    free_shm_matrix(result, res_id, shm_ids);
 	return 0;
 }
 
