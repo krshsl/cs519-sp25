@@ -54,15 +54,15 @@
  			   mlock.o mmap.o mmu_gather.o mprotect.o mremap.o \
  			   msync.o page_vma_mapped.o pagewalk.o \
  			   pgtable-generic.o rmap.o vmalloc.o
---- /dev/null	2025-04-07 10:40:38.829084698 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-07 19:09:02.168217939 -0600
-@@ -0,0 +1,30 @@
+--- /dev/null	2025-04-07 21:26:27.960000531 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-07 20:44:11.819528076 -0600
+@@ -0,0 +1,31 @@
 +#include <linux/kernel.h>
 +#include <linux/mm.h>
 +#include <linux/printk.h>
 +#include <linux/syscalls.h>
 +
-+pid_t do_extents_pid;
++pid_t do_extents_pid = -1;
 +EXPORT_SYMBOL(do_extents_pid);
 +
 +SYSCALL_DEFINE0(enable_extents)
@@ -82,8 +82,9 @@
 +}
 +
 +void handle_extents(struct vm_fault *vmf) {
-+    if (do_extents_pid) {
-+        printk(KERN_INFO "Handle extents is working!!\n");
++    pid_t pid = task_pid_nr(current);
++    if (pid ==  do_extents_pid) {
++        printk(KERN_INFO "Handle extents is working %d!!\n", do_extents_pid);
 +    }
 +}
 +EXPORT_SYMBOL(handle_extents);
