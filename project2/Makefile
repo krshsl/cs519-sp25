@@ -2,8 +2,8 @@ CC = gcc
 
 all: test
 
-test: test.c
-	$(CC) test.c -o test
+test.o: test.c
+	$(CC) $^ -o $@
 
 clean:
 	rm -f test
