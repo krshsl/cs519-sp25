@@ -15,6 +15,7 @@
 #endif
 
 #define DEFAULT_BUF_SIZE    1048576
+#define MAX_ITERS           10000
 
 static long get_time_us(void) {
     struct timeval tv;
@@ -26,10 +27,12 @@ static long get_time_us(void) {
 }
 
 void init_pages(size_t buf_size) {
+#ifdef USE_SYSCALL
     if (syscall(sys_enable_extents) < 0) {
         perror("syscall enable_extents (test)");
         exit(EXIT_FAILURE);
     }
+#endif
 
     char *buffer = (char *)malloc(buf_size);
     if (!buffer) {
@@ -38,18 +41,20 @@ void init_pages(size_t buf_size) {
     }
     memset(buffer, 4, buf_size); // this should touch all pages...
 
+#ifdef USE_SYSCALL
     if (syscall(sys_disable_extents) < 0) {
         perror("syscall disable_extents (test)");
         free(buffer);
         exit(EXIT_FAILURE);
     }
+#endif
 }
 
 int main(int argc, char **argv) {
     int i;
     long start_time, end_time;
-    long total_time = 0;
-    size_t buf_size;
+    long double total_time = 0;
+    size_t buf_size = DEFAULT_BUF_SIZE;
 
     if (argc > 1) {
         buf_size = (size_t)atoi(argv[1]);
@@ -64,6 +69,14 @@ int main(int argc, char **argv) {
     init_pages(buf_size);
     end_time = get_time_us();
     total_time = end_time - start_time;
-    printf("Total time: %ld microseconds.\n", total_time);
+    printf("Total time: %Lf microseconds for single iteration\n", total_time);
+
+    start_time = get_time_us();
+    for (int i = 0; i < MAX_ITERS; i++) {
+        init_pages(buf_size);
+    }
+    end_time = get_time_us();
+    total_time = (end_time - start_time)/MAX_ITERS;
+    printf("Total time: %Lf microseconds for %d iteration\n", total_time, MAX_ITERS);
     return EXIT_SUCCESS;
 }
