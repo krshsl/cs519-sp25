@@ -1,0 +1,10 @@
+--- ../project2/linux-5.15.0/mm/memory.c.orig	2025-04-09 14:52:13.245978432 -0600
++++ ../project2/linux-5.15.0/mm/memory.c	2025-04-09 14:52:13.257978620 -0600
+@@ -3783,6 +3783,7 @@
+  */
+ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
+ {
++	handle_extents(vmf);
+ 	struct vm_area_struct *vma = vmf->vma;
+ 	struct page *page;
+ 	vm_fault_t ret = 0;

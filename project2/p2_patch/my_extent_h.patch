@@ -1,0 +1,16 @@
+--- /dev/null	2025-04-09 13:08:45.556000143 -0600
++++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-09 14:59:47.785118060 -0600
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_MM_H
++#define _LINUX_MM_H
++
++#include <linux/errno.h>
++
++#ifdef __KERNEL__
++#include <linux/mm.h>
++
++extern void handle_extents(struct vm_fault *vmf);
++extern pid_t do_extents_pid;
++#endif /* __KERNEL__ */
++#endif /* _LINUX_MM_H */

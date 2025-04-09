@@ -6,3 +6,4 @@ linux-headers-5.15.0*
 *.out
 
 .vscode/settings.json
+.zed/settings.json

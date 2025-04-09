@@ -1,0 +1,34 @@
+--- /dev/null	2025-04-09 13:08:45.556000143 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-09 15:00:12.285503707 -0600
+@@ -0,0 +1,31 @@
++#include <linux/kernel.h>
++#include <linux/my_extent.h>
++#include <linux/printk.h>
++#include <linux/syscalls.h>
++
++pid_t do_extents_pid = -1;
++EXPORT_SYMBOL(do_extents_pid);
++
++SYSCALL_DEFINE0(enable_extents)
++{
++    pid_t pid = task_pid_nr(current);
++    do_extents_pid = pid;
++    return 0;
++}
++
++SYSCALL_DEFINE0(disable_extents)
++{
++    pid_t pid = task_pid_nr(current);
++    if (pid == do_extents_pid) {
++        do_extents_pid = -1;
++    }
++    return 0;
++}
++
++void handle_extents(struct vm_fault *vmf) {
++    pid_t pid = task_pid_nr(current);
++    if (pid ==  do_extents_pid) {
++        printk(KERN_INFO "Handle extents is working %d!!\n", do_extents_pid);
++    }
++}
++EXPORT_SYMBOL(handle_extents);
