@@ -1,5 +1,5 @@
 --- /dev/null	2025-04-10 00:28:07.172000538 -0600
-+++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-10 11:57:48.174298516 -0600
++++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-10 12:48:48.603255735 -0600
 @@ -0,0 +1,38 @@
 +#ifndef _LINUX_MY_EX_H
 +#define _LINUX_MY_EX_H
@@ -14,8 +14,8 @@
 +
 +struct list_extns {
 +    struct list_head pg_list;
-+    unsigned long pte;
-+    long long vma;
++    unsigned long vma;
++    unsigned long long pte;
 +};
 +
 +struct rb_extns {
@@ -29,8 +29,8 @@
 +void free_pg_list(struct list_head *head);
 +void free_pg_tree(void);
 +
-+int compare_pg(struct rb_node **cursor, struct rb_extns *node, unsigned long long pte);
-+struct rb_extns *pg_search(struct rb_root *root, unsigned long vma, unsigned long long pte);
++int compare_pg(struct rb_node **cursor, struct rb_extns *node, unsigned long vma);
++struct rb_extns *pg_search(struct rb_root *root, unsigned long vma);
 +int pg_insert(struct rb_root *root, struct rb_extns *data);
 +
 +struct list_extns *create_extn(unsigned long vma, unsigned long long pte);
