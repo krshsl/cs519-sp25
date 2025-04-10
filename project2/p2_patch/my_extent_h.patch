@@ -1,6 +1,6 @@
---- /dev/null	2025-04-09 13:08:45.556000143 -0600
-+++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-09 14:59:47.785118060 -0600
-@@ -0,0 +1,13 @@
+--- /dev/null	2025-04-09 17:26:49.608000450 -0600
++++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-09 18:15:08.841372036 -0600
+@@ -0,0 +1,26 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _LINUX_MM_H
 +#define _LINUX_MM_H
@@ -9,8 +9,21 @@
 +
 +#ifdef __KERNEL__
 +#include <linux/mm.h>
++#include <linux/rbtree.h>
++#include <linux/list.h>
 +
-+extern void handle_extents(struct vm_fault *vmf);
++struct pg_extns {
++    struct list_head list;
++    unsigned long pte;
++    unsigned long vma;
++};
++
++struct rb_extns {
++    struct rb_node r_node;
++    struct pg_extns p_node;
++    size_t count;
++};
++
 +extern pid_t do_extents_pid;
 +#endif /* __KERNEL__ */
 +#endif /* _LINUX_MM_H */
