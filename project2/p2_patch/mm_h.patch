@@ -1,10 +1,10 @@
---- ../project2/linux-5.15.0/include/linux/mm.h.orig	2025-04-09 15:03:49.904932087 -0600
-+++ ../project2/linux-5.15.0/include/linux/mm.h	2025-04-09 19:50:21.291036706 -0600
+--- ../project2/linux-5.15.0/include/linux/mm.h.orig	2025-04-09 21:28:08.433665628 -0600
++++ ../project2/linux-5.15.0/include/linux/mm.h	2025-04-09 23:36:17.746149401 -0600
 @@ -3326,5 +3326,7 @@
  	return 0;
  }
  
 +/* my_extent handling */
-+extern void handle_extents(unsigned long vma, long long pte);
++extern void handle_extents(unsigned long vma, unsigned long long pte);
  #endif /* __KERNEL__ */
  #endif /* _LINUX_MM_H */

@@ -1,10 +1,10 @@
---- ../project2/linux-5.15.0/mm/memory.c.orig	2025-04-09 14:52:13.245978432 -0600
-+++ ../project2/linux-5.15.0/mm/memory.c	2025-04-09 19:51:49.736595771 -0600
+--- ../project2/linux-5.15.0/mm/memory.c.orig	2025-04-09 22:24:28.178308847 -0600
++++ ../project2/linux-5.15.0/mm/memory.c	2025-04-09 23:36:44.306633082 -0600
 @@ -3875,6 +3875,7 @@
  	inc_mm_counter_fast(vma->vm_mm, MM_ANONPAGES);
  	page_add_new_anon_rmap(page, vma, vmf->address, false);
  	lru_cache_add_inactive_or_unevictable(page, vma);
-+	handle_extents(vmf->address, (long long)pte_val(entry));
++	handle_extents(vmf->address, pte_val(entry));
  setpte:
  	set_pte_at(vma->vm_mm, vmf->address, vmf->pte, entry);
  
