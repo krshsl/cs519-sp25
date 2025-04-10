@@ -8,6 +8,7 @@ do
     if [ -f "${pF}.orig" ]; then
         cp "${pF}" "${pF}.orig"
     fi
+    cp "${pF}.orig" "${pF}.orig1"
 done
 
 for pfile in p2_patch/*; do
@@ -17,4 +18,10 @@ for pfile in p2_patch/*; do
         git apply --check $pfile
         git apply $pfile
     fi
+done
+
+for i in ${!patch_dirs[@]}
+do
+    pF="${p21}/${patch_dirs[i]}"
+    mv "${pF}.orig1" "${pF}.orig"
 done

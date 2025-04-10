@@ -15,7 +15,7 @@
 #endif
 
 #define DEFAULT_BUF_SIZE    1048576
-#define MAX_ITERS           10000
+#define MAX_ITERS           1000
 
 static long get_time_us(void) {
     struct timeval tv;
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
         }
     }
     printf("Using buffer size: %zu bytes\n", buf_size);
-    
+
     start_time = get_time_us();
     init_pages(buf_size);
     end_time = get_time_us();
