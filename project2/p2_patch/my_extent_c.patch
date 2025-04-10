@@ -1,6 +1,6 @@
 --- /dev/null	2025-04-10 17:31:09.956000565 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-10 17:33:45.371645089 -0600
-@@ -0,0 +1,193 @@
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-10 17:38:18.320131751 -0600
+@@ -0,0 +1,201 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
 +#include <linux/my_extent.h>
@@ -42,9 +42,10 @@
 +}
 +
 +void free_pg_tree(void) {
-+    LOG_FUNCS(KERN_INFO);
 +    struct rb_node *root;
 +    int iter = 0;
++
++    LOG_FUNCS(KERN_INFO);
 +    for (root = rb_first(&expg_root); root;) {
 +        struct rb_node *cursor = rb_next(root);
 +        struct rb_extns *node = rb_entry_safe(root, struct rb_extns, pg_tree);
@@ -60,10 +61,10 @@
 +}
 +
 +int compare_pg(struct rb_node **cursor, struct rb_extns *node, unsigned long vma) {
-+    LOG_FUNCS(KERN_INFO);
 +    struct list_extns *head = list_first_entry_or_null(&node->p_node, struct list_extns, pg_list);
 +    struct list_extns *tail = list_last_entry(&node->p_node, struct list_extns, pg_list);
 +
++    LOG_FUNCS(KERN_INFO);
 +    if (head == NULL) {
 +        LOG_FUNCS(KERN_CRIT, "Invalid entry while adding vma %lu\n", vma);
 +        return -1; // invalid entry!!
@@ -80,8 +81,9 @@
 +}
 +
 +struct rb_extns *pg_search(struct rb_root *root, unsigned long vma) {
-+    LOG_FUNCS(KERN_INFO, "%lu", vma);
 +    struct rb_node *cursor = root->rb_node;
++
++    LOG_FUNCS(KERN_INFO, "%lu", vma);
 +    while(cursor) {
 +        struct rb_extns *node = container_of(cursor, struct rb_extns, pg_tree);
 +        int result = compare_pg(&cursor, node, vma);
@@ -95,12 +97,14 @@
 +}
 +
 +int pg_insert(struct rb_root *root, struct rb_extns *data) {
-+    LOG_FUNCS(KERN_INFO);
 +    struct list_extns *head = list_first_entry_or_null(&data->p_node, struct list_extns, pg_list);
++    struct rb_node **cursor = &(root->rb_node);
++    struct rb_node *parent = NULL;
++
++    LOG_FUNCS(KERN_INFO);
 +    if (head == NULL) return 0;
 +
 +    LOG_FUNCS(KERN_INFO, "%lu:%llu", head->vma, head->pte);
-+    struct rb_node **cursor = &(root->rb_node), *parent = NULL;
 +    while(*cursor) {
 +        struct rb_extns *node = container_of(*cursor, struct rb_extns, pg_tree);
 +        parent = *cursor;
@@ -114,17 +118,19 @@
 +}
 +
 +struct list_extns *create_extn(unsigned long vma, unsigned long long pte) {
-+    LOG_FUNCS(KERN_INFO, "%lu:%llu", vma, pte);
 +    struct list_extns *list_node = kmalloc(sizeof(struct list_extns), GFP_KERNEL);
++    LOG_FUNCS(KERN_INFO, "%lu:%llu", vma, pte);
 +    list_node->vma = vma;
 +    list_node->pte = pte;
 +    return list_node;
 +}
 +
 +void update_pg_extns(struct rb_extns *rb_node, unsigned long vma, unsigned long long pte) {
-+    LOG_FUNCS(KERN_INFO, "%lu:%llu", vma, pte);
 +    struct list_head *head = &rb_node->p_node;
 +    struct list_extns *node = list_first_entry(head, struct list_extns, pg_list);
++    struct list_head *pos = NULL;
++
++    LOG_FUNCS(KERN_INFO, "%lu:%llu", vma, pte);
 +    if (node->vma > vma) {
 +        list_add_tail(&(create_extn(vma, pte))->pg_list, head);
 +        rb_node->count++;
@@ -138,7 +144,6 @@
 +        return;
 +    }
 +
-+    struct list_head *pos = NULL;
 +    list_for_each(pos, head) {
 +        node = list_entry(pos, struct list_extns, pg_list);
 +        if (node->vma != vma) continue;
@@ -148,24 +153,25 @@
 +}
 +
 +void add_extents(unsigned long vma, unsigned long long pte) {
-+    LOG_FUNCS(KERN_INFO, "%lu:%llu", vma, pte);
 +    struct rb_extns *rb_node = kmalloc(sizeof(struct rb_extns), GFP_KERNEL);
++
++    LOG_FUNCS(KERN_INFO, "%lu:%llu", vma, pte);
 +    rb_node->count = 1;
 +    INIT_LIST_HEAD(&rb_node->p_node);
-+
-+
 +    list_add(&create_extn(vma, pte)->pg_list, &rb_node->p_node);
 +    pg_insert(&expg_root, rb_node);
 +    pt_count++;
 +}
 +
 +void handle_extents(unsigned long vma, unsigned long long pte) {
++    struct rb_extns *node = NULL;
 +    pid_t pid = task_pid_nr(current);
++
 +    if (pid ==  do_extents_pid) {
 +        LOG_FUNCS(KERN_INFO, "%lu:%llu", vma, pte);
 +
 +        // currently only updates existing nodes, need to handle the other part too
-+        struct rb_extns *node = pg_search(&expg_root, vma);
++        node = pg_search(&expg_root, vma);
 +        if (node)
 +            update_pg_extns(node, vma, pte);
 +        else
@@ -177,6 +183,7 @@
 +SYSCALL_DEFINE0(enable_extents)
 +{
 +    pid_t pid = task_pid_nr(current);
++
 +    LOG_FUNCS(KERN_INFO, "%d", pid);
 +    do_extents_pid = pid;
 +    pt_count = 0;
@@ -187,6 +194,7 @@
 +{
 +    pid_t pid = task_pid_nr(current);
 +    LOG_FUNCS(KERN_INFO, "%d", pid);
++
 +    if (pid == do_extents_pid) {
 +        do_extents_pid = -1;
 +        pt_count = 0;
