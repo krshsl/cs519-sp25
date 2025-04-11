@@ -1,6 +1,6 @@
---- /dev/null	2025-04-10 19:05:09.576000144 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-10 19:31:58.157336885 -0600
-@@ -0,0 +1,208 @@
+--- /dev/null	2025-04-10 19:48:58.816000561 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-10 20:31:29.536965193 -0600
+@@ -0,0 +1,219 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
 +#include <linux/my_extent.h>
@@ -16,8 +16,10 @@
 +#define LOG_MY_FUNCS
 +
 +#ifdef LOG_MY_FUNCS
++    #define is_empty(dummy, ...) ( sizeof( (char[]){#__VA_ARGS__} ) == 1 )
 +    #define LOG_FUNCS(format, ...) do { \
-+        printk(format "%s:%d::", __func__, __LINE__); \
++        printk(format "%s:%d", __func__, __LINE__); \
++        if (!is_empty(__VA_ARGS__)) printk(KERN_CONT, "::"); \
 +        printk(KERN_CONT __VA_ARGS__); \
 +        printk(KERN_CONT "\n"); \
 +    } while(0)
@@ -62,7 +64,7 @@
 +    }
 +}
 +
-+int compare_pg(struct rb_node **cursor, struct rb_extns *node, unsigned long vma) {
++int compare_pg(struct rb_node *cursor, struct rb_extns *node, unsigned long vma) {
 +    struct list_extns *head = list_first_entry_or_null(&node->p_node, struct list_extns, pg_list);
 +    struct list_extns *tail = list_last_entry(&node->p_node, struct list_extns, pg_list);
 +
@@ -73,13 +75,11 @@
 +    }
 +
 +    if (head->vma > vma)
-+        cursor = &((*cursor)->rb_left);
++        return 1; // continue searching left
 +    else if (tail->vma < vma)
-+        cursor = &((*cursor)->rb_right);
-+    else // most likely within our list of extents
++        return 2; // continue searching right
++    else
 +        return 0;
-+
-+    return 1; // continue searching
 +}
 +
 +struct rb_extns *pg_search(struct rb_root *root, unsigned long vma) {
@@ -91,11 +91,15 @@
 +        struct rb_extns *node = container_of(cursor, struct rb_extns, pg_tree);
 +
 +        LOG_FUNCS(KERN_INFO, "%lu", vma);
-+        result = compare_pg(&cursor, node, vma);
++        result = compare_pg(cursor, node, vma);
 +
 +        if (result == -1)
 +            return NULL;
-+        else if (result == 0)
++        else if (result == 1)
++            cursor = cursor->rb_left;
++        else if (result == 2)
++            cursor = cursor->rb_right;
++        else
 +            return node;
 +    }
 +    return NULL;
@@ -103,22 +107,29 @@
 +
 +int pg_insert(struct rb_root *root, struct rb_extns *data) {
 +    struct list_extns *head = list_first_entry_or_null(&data->p_node, struct list_extns, pg_list);
-+    struct rb_node *cursor = root->rb_node;
++    struct rb_node **cursor = &(root->rb_node);
 +    struct rb_node *parent = NULL;
++    int result;
 +
 +    LOG_FUNCS(KERN_INFO);
 +    if (head == NULL) return 0;
 +
 +    LOG_FUNCS(KERN_INFO, "%lu:%llu", head->vma, head->pte);
-+    while(cursor) {
-+        struct rb_extns *node = container_of(cursor, struct rb_extns, pg_tree);
-+        parent = cursor;
++    while(*cursor) {
++        struct rb_extns *node = container_of(*cursor, struct rb_extns, pg_tree);
++        parent = *cursor;
 +
 +        LOG_FUNCS(KERN_INFO, "%lu:%llu", head->vma, head->pte);
-+        if (compare_pg(&cursor, node, head->vma) != 1) return 0;
++        result = compare_pg(*cursor, node, head->vma);
++        if (result == 1)
++            cursor = &((*cursor)->rb_left);
++        else if (result == 2)
++            cursor = &((*cursor)->rb_right);
++        else
++            return 0;
 +    }
 +
-+    rb_link_node(&data->pg_tree, parent, &cursor);
++    rb_link_node(&data->pg_tree, parent, cursor);
 +    rb_insert_color(&data->pg_tree, root);
 +    LOG_FUNCS(KERN_INFO, "%lu:%llu", head->vma, head->pte);
 +    return 1;
@@ -200,7 +211,7 @@
 +SYSCALL_DEFINE0(disable_extents)
 +{
 +    pid_t pid = task_pid_nr(current);
-+    LOG_FUNCS(KERN_INFO, "%d", pid);
++    LOG_FUNCS(KERN_INFO, "%d had %zu pages", pid, pt_count);
 +
 +    if (pid == do_extents_pid) {
 +        do_extents_pid = -1;
