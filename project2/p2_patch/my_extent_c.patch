@@ -1,6 +1,6 @@
---- /dev/null	2025-04-10 17:31:09.956000565 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-10 17:38:18.320131751 -0600
-@@ -0,0 +1,201 @@
+--- /dev/null	2025-04-10 18:05:22.096000570 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-10 18:07:26.160715613 -0600
+@@ -0,0 +1,205 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
 +#include <linux/my_extent.h>
@@ -64,7 +64,7 @@
 +    struct list_extns *head = list_first_entry_or_null(&node->p_node, struct list_extns, pg_list);
 +    struct list_extns *tail = list_last_entry(&node->p_node, struct list_extns, pg_list);
 +
-+    LOG_FUNCS(KERN_INFO);
++    LOG_FUNCS(KERN_INFO, "%lu", vma);
 +    if (head == NULL) {
 +        LOG_FUNCS(KERN_CRIT, "Invalid entry while adding vma %lu\n", vma);
 +        return -1; // invalid entry!!
@@ -82,11 +82,14 @@
 +
 +struct rb_extns *pg_search(struct rb_root *root, unsigned long vma) {
 +    struct rb_node *cursor = root->rb_node;
++    int result;
 +
 +    LOG_FUNCS(KERN_INFO, "%lu", vma);
 +    while(cursor) {
 +        struct rb_extns *node = container_of(cursor, struct rb_extns, pg_tree);
-+        int result = compare_pg(&cursor, node, vma);
++
++        LOG_FUNCS(KERN_INFO, "%lu", vma);
++        result = compare_pg(&cursor, node, vma);
 +
 +        if (result == -1)
 +            return NULL;
@@ -98,21 +101,22 @@
 +
 +int pg_insert(struct rb_root *root, struct rb_extns *data) {
 +    struct list_extns *head = list_first_entry_or_null(&data->p_node, struct list_extns, pg_list);
-+    struct rb_node **cursor = &(root->rb_node);
++    struct rb_node *cursor = root->rb_node;
 +    struct rb_node *parent = NULL;
 +
 +    LOG_FUNCS(KERN_INFO);
 +    if (head == NULL) return 0;
 +
 +    LOG_FUNCS(KERN_INFO, "%lu:%llu", head->vma, head->pte);
-+    while(*cursor) {
-+        struct rb_extns *node = container_of(*cursor, struct rb_extns, pg_tree);
-+        parent = *cursor;
++    while(cursor) {
++        struct rb_extns *node = container_of(cursor, struct rb_extns, pg_tree);
++        parent = cursor;
 +
-+        if (compare_pg(cursor, node, head->vma) != 1) return 0;
++        LOG_FUNCS(KERN_INFO, "%lu:%llu", head->vma, head->pte);
++        if (compare_pg(&cursor, node, head->vma) != 1) return 0;
 +    }
 +
-+    rb_link_node(&data->pg_tree, parent, cursor);
++    rb_link_node(&data->pg_tree, parent, &cursor);
 +    rb_insert_color(&data->pg_tree, root);
 +    return 1;
 +}
