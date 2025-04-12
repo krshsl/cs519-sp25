@@ -1,5 +1,5 @@
---- /dev/null	2025-04-12 12:27:25.320000543 -0600
-+++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-12 12:50:14.397354546 -0600
+--- /dev/null	2025-04-12 14:00:19.076000569 -0600
++++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-12 13:43:04.154913831 -0600
 @@ -0,0 +1,43 @@
 +#ifndef _LINUX_MY_EX_H
 +#define _LINUX_MY_EX_H
@@ -31,7 +31,7 @@
 +void free_pg_tree(void);
 +void print_pg_tree(void);
 +
-+int compare_pg(struct rb_node **cursor, struct rb_extns *node, unsigned long vma);
++int compare_pg(struct rb_node *cursor, unsigned long vma);
 +struct rb_extns *pg_search(struct rb_root *root, unsigned long vma);
 +int pg_insert(struct rb_extns *data);
 +
