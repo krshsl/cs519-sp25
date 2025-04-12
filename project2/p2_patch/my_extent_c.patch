@@ -1,8 +1,6 @@
---- /dev/null	2025-04-12 11:46:12.832000561 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-12 12:10:41.360979219 -0600
-@@ -0,0 +1,288 @@
-+#include "linux/kern_levels.h"
-+#include "linux/list.h"
+--- /dev/null	2025-04-12 12:27:25.320000543 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-12 12:57:31.356521019 -0600
+@@ -0,0 +1,292 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
 +#include <linux/my_extent.h>
@@ -113,26 +111,32 @@
 +    return NULL;
 +}
 +
-+int pg_insert(struct rb_root *root, struct rb_extns *data) {
++int pg_insert(struct rb_extns *data) {
 +    struct list_extns *head = list_first_entry_or_null(&data->p_node, struct list_extns, pg_list);
-+    struct rb_node **cursor = &(root->rb_node);
++    struct rb_node **cursor = &expg_root.rb_node;
 +    struct rb_node *parent = NULL;
++    struct rb_extns *node;
 +    int result;
 +
 +    // LOG_FUNCS(KERN_DEBUG);
-+    if (head == NULL) return 0;
++    if (head == NULL) {
++        LOG_FUNCS(KERN_CRIT, "data is null!! %lu:%llu", head->vma, head->pte);
++        return 0;
++    }
 +
 +    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", head->vma, head->pte);
 +    while(*cursor) {
-+        struct rb_extns *node = container_of(*cursor, struct rb_extns, pg_tree);
 +        parent = *cursor;
-+
++        node = container_of(parent, struct rb_extns, pg_tree);
 +        result = compare_pg(cursor, node, head->vma);
-+        if (result != 1) return 0;
++        if (result != 1) {
++            LOG_FUNCS(KERN_CRIT, "failing for some reason... %lu:%llu", head->vma, head->pte);
++            return 0;
++        }
 +    }
 +
 +    rb_link_node(&data->pg_tree, parent, cursor);
-+    rb_insert_color(&data->pg_tree, root);
++    rb_insert_color(&data->pg_tree, &expg_root);
 +    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", head->vma, head->pte);
 +    return 1;
 +}
@@ -149,14 +153,14 @@
 +
 +void update_pg_extns(struct rb_extns *rb_node, unsigned long vma, unsigned long long pte) {
 +    struct list_head *head = &rb_node->p_node;
-+    struct list_extns *node = list_first_entry(head, struct list_extns, pg_list);
++    struct list_extns *node = NULL;
 +    struct list_head *pos = NULL;
 +
 +    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
 +    list_for_each(pos, head) {
 +        node = list_entry(pos, struct list_extns, pg_list);
 +        if (node->vma != vma) continue;
-+        node->vma = vma;
++        node->pte = pte;
 +        return;
 +    }
 +}
@@ -168,7 +172,7 @@
 +    rb_node->count = 1;
 +    INIT_LIST_HEAD(&rb_node->p_node);
 +    list_add(&new_node->pg_list, &rb_node->p_node);
-+    pg_insert(&expg_root, rb_node);
++    pg_insert(rb_node);
 +    pt_count++;
 +}
 +
