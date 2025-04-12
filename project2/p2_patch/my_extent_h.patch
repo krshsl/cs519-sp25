@@ -1,5 +1,5 @@
---- /dev/null	2025-04-12 14:00:19.076000569 -0600
-+++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-12 13:43:04.154913831 -0600
+--- /dev/null	2025-04-12 14:22:08.968000147 -0600
++++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-12 14:37:32.762326618 -0600
 @@ -0,0 +1,43 @@
 +#ifndef _LINUX_MY_EX_H
 +#define _LINUX_MY_EX_H
@@ -33,7 +33,7 @@
 +
 +int compare_pg(struct rb_node *cursor, unsigned long vma);
 +struct rb_extns *pg_search(struct rb_root *root, unsigned long vma);
-+int pg_insert(struct rb_extns *data);
++void pg_insert(struct rb_extns *data);
 +
 +struct list_extns *create_extn(unsigned long vma, unsigned long long pte);
 +void update_pg_extns(struct rb_extns *rb_node, unsigned long vma, unsigned long long pte);
