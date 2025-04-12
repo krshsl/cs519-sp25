@@ -1,6 +1,6 @@
---- /dev/null	2025-04-11 22:17:33.755999525 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-11 22:39:05.716883533 -0600
-@@ -0,0 +1,276 @@
+--- /dev/null	2025-04-12 10:39:07.720000557 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-12 11:33:03.284428080 -0600
+@@ -0,0 +1,294 @@
 +#include "linux/kern_levels.h"
 +#include "linux/list.h"
 +#include <linux/kernel.h>
@@ -67,13 +67,28 @@
 +    }
 +}
 +
++void print_pg_tree(void) {
++    struct rb_extns *tmp, *node;
++    struct list_extns *curr;
++    int iter = 0;
++
++    rbtree_postorder_for_each_entry_safe(node, tmp, &expg_root, pg_tree) {
++        LOG_FUNCS(KERN_DEBUG);
++        LPRINTK(KERN_CONT "%d:%zu::", iter++, node->count);
++        list_for_each_entry(curr, &node->p_node, pg_list) {
++            LPRINTK(KERN_CONT "%lu:%llu::", curr->vma, curr->pte);
++        }
++        LPRINTK(KERN_CONT "\n");
++    }
++}
++
 +int compare_pg(struct rb_node **cursor, struct rb_extns *node, unsigned long vma) {
 +    struct list_extns *head = list_first_entry_or_null(&node->p_node, struct list_extns, pg_list);
 +    struct list_extns *tail = list_last_entry(&node->p_node, struct list_extns, pg_list);
 +
 +    // LOG_FUNCS(KERN_DEBUG, "%lu", vma);
 +    if (head == NULL) {
-+        printk(KERN_CRIT "%s:%d::Invalid entry while adding vma %lu\n", __func__, __LINE__, vma);
++        LPRINTK(KERN_CRIT "%s:%d::Invalid entry while adding vma %lu", __func__, __LINE__, vma);
 +        return -1; // invalid entry!!
 +    }
 +
@@ -171,6 +186,7 @@
 +    vma += PAGE_SIZE;
 +    pte += PAGE_SIZE;
 +    rb_node = pg_search(&expg_root, vma);
++    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
 +    if (rb_node == NULL) {
 +        return NULL;
 +    }
@@ -192,6 +208,7 @@
 +    vma -= PAGE_SIZE;
 +    pte -= PAGE_SIZE;
 +    rb_node = pg_search(&expg_root, vma);
++    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
 +    if (rb_node == NULL) {
 +        return NULL;
 +    }
@@ -273,6 +290,7 @@
 +    if (pid == do_extents_pid) {
 +        do_extents_pid = -1;
 +        total_extents = pt_count = 0;
++        print_pg_tree();
 +        free_pg_tree();
 +    }
 +    return 0;
