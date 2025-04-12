@@ -1,6 +1,6 @@
---- /dev/null	2025-04-11 19:49:10.080000570 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-11 20:02:42.056062037 -0600
-@@ -0,0 +1,280 @@
+--- /dev/null	2025-04-11 21:00:00.456000548 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-11 21:08:44.656477924 -0600
+@@ -0,0 +1,283 @@
 +#include "linux/kern_levels.h"
 +#include "linux/list.h"
 +#include <linux/kernel.h>
@@ -64,7 +64,7 @@
 +    while ((root = rb_first(&expg_root)) != NULL) {
 +        struct rb_extns *node = rb_entry_safe(root, struct rb_extns, pg_tree);
 +        if (node) {
-+            LPRINTK(KERN_DEBUG, "%d:%zu::", iter, node->count);
++            LPRINTK(KERN_DEBUG "%d:%zu::", iter, node->count);
 +            free_pg_list(&node->p_node);
 +            kfree(node);
 +        } else {
@@ -142,6 +142,7 @@
 +struct list_extns *create_extn(unsigned long vma, unsigned long long pte) {
 +    struct list_extns *list_node = kmalloc(sizeof(struct list_extns), GFP_KERNEL);
 +    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
++    INIT_LIST_HEAD(&list_node->pg_list);
 +    list_node->vma = vma;
 +    list_node->pte = pte;
 +    total_extents++;
@@ -186,6 +187,7 @@
 +    }
 +
 +    node = list_first_entry(&rb_node->p_node, struct list_extns, pg_list);
++    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", node->vma, node->pte);
 +    if (node->vma == vma && node->pte == pte) {
 +        return rb_node;
 +    }
@@ -206,6 +208,7 @@
 +    }
 +
 +    node = list_last_entry(&rb_node->p_node, struct list_extns, pg_list);
++    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", node->vma, node->pte);
 +    if (node->vma == vma && node->pte == pte) {
 +        return rb_node;
 +    }
