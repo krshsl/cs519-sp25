@@ -1,6 +1,6 @@
---- /dev/null	2025-04-10 19:48:58.816000561 -0600
-+++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-10 20:25:55.767427388 -0600
-@@ -0,0 +1,39 @@
+--- /dev/null	2025-04-10 21:26:48.468000549 -0600
++++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-11 19:04:38.878777332 -0600
+@@ -0,0 +1,42 @@
 +#ifndef _LINUX_MY_EX_H
 +#define _LINUX_MY_EX_H
 +
@@ -30,12 +30,15 @@
 +void free_pg_list(struct list_head *head);
 +void free_pg_tree(void);
 +
-+int compare_pg(struct rb_node *cursor, struct rb_extns *node, unsigned long vma);
++int compare_pg(struct rb_node **cursor, struct rb_extns *node, unsigned long vma);
 +struct rb_extns *pg_search(struct rb_root *root, unsigned long vma);
 +int pg_insert(struct rb_root *root, struct rb_extns *data);
 +
 +struct list_extns *create_extn(unsigned long vma, unsigned long long pte);
 +void update_pg_extns(struct rb_extns *rb_node, unsigned long vma, unsigned long long pte);
++void create_extents(struct list_extns *new_node);
++struct rb_extns *should_join_front(unsigned long vma, unsigned long long pte);
++struct rb_extns *should_join_back(unsigned long vma, unsigned long long pte);
 +void add_extents(unsigned long vma, unsigned long long pte);
 +
 +#endif /* __KERNEL__ */
