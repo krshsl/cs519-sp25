@@ -1,6 +1,6 @@
---- /dev/null	2025-04-10 21:26:48.468000549 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-11 19:10:56.816910948 -0600
-@@ -0,0 +1,273 @@
+--- /dev/null	2025-04-11 19:49:10.080000570 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-11 20:02:42.056062037 -0600
+@@ -0,0 +1,280 @@
 +#include "linux/kern_levels.h"
 +#include "linux/list.h"
 +#include <linux/kernel.h>
@@ -181,6 +181,10 @@
 +    vma += PAGE_SIZE;
 +    pte += PAGE_SIZE;
 +    rb_node = pg_search(&expg_root, vma);
++    if (rb_node == NULL) {
++        return NULL;
++    }
++
 +    node = list_first_entry(&rb_node->p_node, struct list_extns, pg_list);
 +    if (node->vma == vma && node->pte == pte) {
 +        return rb_node;
@@ -197,6 +201,10 @@
 +    vma -= PAGE_SIZE;
 +    pte -= PAGE_SIZE;
 +    rb_node = pg_search(&expg_root, vma);
++    if (rb_node == NULL) {
++        return NULL;
++    }
++
 +    node = list_last_entry(&rb_node->p_node, struct list_extns, pg_list);
 +    if (node->vma == vma && node->pte == pte) {
 +        return rb_node;
@@ -220,8 +228,7 @@
 +        front->count++;
 +
 +        if (back) {
-+            struct list_extns * last_entry= list_last_entry(&back->p_node, struct list_extns, pg_list);
-+            list_splice(&last_entry->pg_list, &front->p_node); // join front to end of back
++            list_splice(&front->p_node, back->p_node.prev); // join front to end of back
 +            back->count += front->count;
 +
 +            // front has been removed, so better to remove this
