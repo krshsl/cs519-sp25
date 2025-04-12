@@ -1,5 +1,5 @@
---- /dev/null	2025-04-11 21:52:29.548000551 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-11 21:53:40.823690813 -0600
+--- /dev/null	2025-04-11 22:17:33.755999525 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-11 22:39:05.716883533 -0600
 @@ -0,0 +1,276 @@
 +#include "linux/kern_levels.h"
 +#include "linux/list.h"
@@ -226,13 +226,13 @@
 +            back->count += front->count;
 +
 +            // front has been removed, so better to remove this
-+            free_pg_list(&front->p_node);
++            rb_erase(&front->pg_tree, &expg_root);
 +            kfree(front);
 +            pt_count--;
 +        }
 +    } else if (back) {
 +        LOG_FUNCS(KERN_DEBUG, "list_add_tail::%lu:%llu", vma, pte);
-+        list_add_tail(&new_node->pg_list, &front->p_node); // add to the rear: head->prev is now node
++        list_add_tail(&new_node->pg_list, &back->p_node); // add to the rear: head->prev is now node
 +    } else {
 +        LOG_FUNCS(KERN_DEBUG, "create_extents::%lu:%llu", vma, pte);
 +        create_extents(new_node);
