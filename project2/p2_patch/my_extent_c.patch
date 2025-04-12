@@ -1,6 +1,6 @@
---- /dev/null	2025-04-12 10:39:07.720000557 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-12 11:33:03.284428080 -0600
-@@ -0,0 +1,294 @@
+--- /dev/null	2025-04-12 11:46:12.832000561 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-12 12:10:41.360979219 -0600
+@@ -0,0 +1,288 @@
 +#include "linux/kern_levels.h"
 +#include "linux/list.h"
 +#include <linux/kernel.h>
@@ -40,10 +40,9 @@
 +
 +    LOG_FUNCS(KERN_ALERT);
 +    list_for_each_entry_safe(curr, node, head, pg_list) {
-+        LPRINTK(KERN_CONT "%lu:%llu", curr->vma, curr->pte);
++        LPRINTK(KERN_CONT "%lu:%llu,", curr->vma, curr->pte);
 +        list_del(&curr->pg_list);
 +        kfree(curr);
-+        LPRINTK(KERN_CONT ",");
 +    }
 +    LPRINTK(KERN_CONT "\n");
 +}
@@ -53,17 +52,12 @@
 +    int iter = 0;
 +
 +    LOG_FUNCS(KERN_DEBUG);
-+    while ((root = rb_first(&expg_root)) != NULL) {
-+        struct rb_extns *node = rb_entry_safe(root, struct rb_extns, pg_tree);
-+        if (node) {
-+            LPRINTK(KERN_DEBUG "%d:%zu::", iter, node->count);
-+            free_pg_list(&node->p_node);
-+            kfree(node);
-+        } else {
-+            printk(KERN_CRIT "%s:%d::%d", __func__, __LINE__, iter);
-+        }
-+        rb_erase(root, &expg_root);
-+        iter++;
++    while ((root = rb_first(&expg_root))) {
++        struct rb_extns *node = rb_entry(root, struct rb_extns, pg_tree);
++        LPRINTK(KERN_DEBUG "%d:%zu::", iter++, node->count);
++        rb_erase(&node->pg_tree, &expg_root);
++        free_pg_list(&node->p_node);
++        kfree(node);
 +    }
 +}
 +
@@ -73,10 +67,10 @@
 +    int iter = 0;
 +
 +    rbtree_postorder_for_each_entry_safe(node, tmp, &expg_root, pg_tree) {
-+        LOG_FUNCS(KERN_DEBUG);
++        LPRINTK(KERN_DEBUG "%s:%d", __func__, __LINE__);
 +        LPRINTK(KERN_CONT "%d:%zu::", iter++, node->count);
 +        list_for_each_entry(curr, &node->p_node, pg_list) {
-+            LPRINTK(KERN_CONT "%lu:%llu::", curr->vma, curr->pte);
++            LPRINTK(KERN_CONT "%lu:%llu,", curr->vma, curr->pte);
 +        }
 +        LPRINTK(KERN_CONT "\n");
 +    }
@@ -186,14 +180,14 @@
 +    vma += PAGE_SIZE;
 +    pte += PAGE_SIZE;
 +    rb_node = pg_search(&expg_root, vma);
-+    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
 +    if (rb_node == NULL) {
 +        return NULL;
 +    }
 +
++    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
 +    node = list_first_entry(&rb_node->p_node, struct list_extns, pg_list);
-+    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", node->vma, node->pte);
 +    if (node->vma == vma && node->pte == pte) {
++        LOG_FUNCS(KERN_DEBUG, "%lu:%llu", node->vma, node->pte);
 +        return rb_node;
 +    }
 +
@@ -208,14 +202,14 @@
 +    vma -= PAGE_SIZE;
 +    pte -= PAGE_SIZE;
 +    rb_node = pg_search(&expg_root, vma);
-+    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
 +    if (rb_node == NULL) {
 +        return NULL;
 +    }
 +
++    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
 +    node = list_last_entry(&rb_node->p_node, struct list_extns, pg_list);
-+    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", node->vma, node->pte);
 +    if (node->vma == vma && node->pte == pte) {
++        LOG_FUNCS(KERN_DEBUG, "%lu:%llu", node->vma, node->pte);
 +        return rb_node;
 +    }
 +
