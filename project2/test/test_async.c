@@ -25,7 +25,7 @@ void perform_oprs(int threads, size_t buf_size) {
     printf("Average time: %Lf microseconds for %d each thread\n", total_time/threads, threads);
 #ifdef USE_SYSCALL
     printf("For %d threads: %d extents and %d pages were used in total\n", threads, *extns, *pages);
-    printf("For %d thread: %d extents and %d pages were used on average\n", threads, (*extns)/threads, (*pages)/threads);
+    printf("For %d threads: %d extents and %d pages were used on average\n", threads, (*extns)/threads, (*pages)/threads);
 #endif
     for (i = 0; i < threads; i++) {
         if (!buffers[i] || munmap(buffers[i], buf_size) != 0) {
