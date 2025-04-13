@@ -38,11 +38,12 @@ static long get_time_us(void) {
 }
 
 void *create_bufs(void *arg) {
-    if (syscall(sys_print_pid) < 0) {
-        perror("syscall sys_print_pid (test)");
-        exit(EXIT_FAILURE);
-    }
-
+// #ifdef USE_SYSCALL
+    // if (syscall(sys_print_pid) < 0) {
+    //     perror("syscall sys_print_pid (test)");
+    //     exit(EXIT_FAILURE);
+    // }
+// #endif
     size_t *buf_size = (size_t*)arg;
     char *buffer = (char *)malloc(*buf_size);
     if (!buffer) {
@@ -86,16 +87,20 @@ void init_pages(size_t buf_size, int *extns, int *pages) {
 void repeat_oprs(int iter, size_t buf_size) {
     long start_time, end_time;
     long double total_time = 0;
-    int extns_cnt, pages_cnt, extns, pages, i;
+    int extns_cnt, pages_cnt, *extns, *pages, i;
     extns_cnt = pages_cnt = i = 0;
+    extns = (int*)malloc(sizeof(int));
+    pages = (int*)malloc(sizeof(int));
     start_time = get_time_us();
     for (; i < iter; i++) {
-        init_pages(buf_size, &extns, &pages);
-        extns_cnt += extns;
-        pages_cnt += pages;
+        init_pages(buf_size, extns, pages);
+        extns_cnt += *extns;
+        pages_cnt += *pages;
     }
     end_time = get_time_us();
     total_time = (end_time - start_time)/iter;
+    free(extns);
+    free(pages);
     printf("Total time: %Lf microseconds for %d iteration\n", total_time, iter);
 #ifdef USE_SYSCALL
     printf("For %d iterations: %d extents and %d pages were used in total\n", iter, extns_cnt, pages_cnt);
@@ -105,10 +110,12 @@ void repeat_oprs(int iter, size_t buf_size) {
 void multi_oprs(size_t buf_size) {
     long start_time, end_time;
     long double total_time = 0;
-    int extns_cnt, pages_cnt, i;
+    int *extns_cnt, *pages_cnt, i;
     pthread_t ptid[MAX_PROCS];
     void **buffers = malloc(MAX_PROCS*sizeof(void*));
     memset(buffers, 0, MAX_PROCS*sizeof(void*));
+    extns_cnt = (int*)malloc(sizeof(int));
+    pages_cnt = (int*)malloc(sizeof(int));
     start_time = get_time_us();
 #ifdef USE_SYSCALL
     if (syscall(sys_enable_extents) < 0) {
@@ -146,8 +153,10 @@ void multi_oprs(size_t buf_size) {
     total_time = end_time - start_time;
     printf("Total time: %Lf microseconds for %d threads\n", total_time, MAX_PROCS);
 #ifdef USE_SYSCALL
-    printf("For %d threads: %d extents and %d pages were used in total\n", MAX_PROCS, extns_cnt, pages_cnt);
+    printf("For %d threads: %d extents and %d pages were used in total\n", MAX_PROCS, *extns_cnt, *pages_cnt);
 #endif
+    free(extns_cnt);
+    free(pages_cnt);
 }
 
 int main(int argc, char **argv) {

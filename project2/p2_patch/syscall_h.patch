@@ -1,5 +1,5 @@
 --- ../project2/linux-5.15.0/include/linux/syscalls.h.orig	2025-04-09 22:19:08.892962646 -0600
-+++ ../project2/linux-5.15.0/include/linux/syscalls.h	2025-04-12 18:57:29.389501147 -0600
++++ ../project2/linux-5.15.0/include/linux/syscalls.h	2025-04-12 22:50:18.947769719 -0600
 @@ -1279,6 +1279,11 @@
   */
  asmlinkage long sys_ni_syscall(void);

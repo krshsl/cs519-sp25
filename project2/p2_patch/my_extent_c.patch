@@ -1,6 +1,6 @@
---- /dev/null	2025-04-12 17:57:19.024000148 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-12 19:37:01.182451830 -0600
-@@ -0,0 +1,330 @@
+--- /dev/null	2025-04-12 22:31:40.536000551 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-12 22:50:56.244363154 -0600
+@@ -0,0 +1,349 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
 +#include <linux/my_extent.h>
@@ -271,7 +271,7 @@
 +
 +void handle_extents(unsigned long vma, unsigned long long pte) {
 +    struct rb_extns *node = NULL;
-+    pid_t pid = task_pid_nr(current);
++    pid_t pid = current->tgid;
 +
 +    if (pid ==  do_extents_pid) {
 +        LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
@@ -288,10 +288,11 @@
 +SYSCALL_DEFINE0(enable_extents) {
 +    pid_t pid;
 +    if (do_extents_pid != -1) {
-+        return -1;
++        return -EFAULT;
 +    }
 +
-+    pid = task_pid_nr(current);
++    // since all child process are part of the same thread group, better to use tgid here
++    pid = current->tgid;
 +    LOG_FUNCS(KERN_ALERT "%d", pid);
 +    do_extents_pid = pid;
 +    atomic_set(&pt_count, 0);
@@ -300,8 +301,10 @@
 +}
 +
 +SYSCALL_DEFINE0(disable_extents) {
-+    pid_t pid = task_pid_nr(current);
++    // since all child process are part of the same thread group, better to use tgid here
++    pid_t pid = current->tgid;
 +
++    // if your program quits prematurely, reboot your system to get this up and running again
 +    if (pid == do_extents_pid) {
 +        LOG_FUNCS(KERN_ALERT "%d had %d extents and %d pages", pid, pt_count.counter, total_extents.counter);
 +
@@ -311,23 +314,39 @@
 +        // print_pg_tree();
 +        free_pg_tree();
 +    } else {
-+        return -1;
++        return -EFAULT;
 +    }
 +    return 0;
 +}
 +
 +SYSCALL_DEFINE2(get_ex_count, int *, extns, int *, pages) {
-+    *extns = pt_count.counter;
-+    *pages = total_extents.counter;
++    if (copy_to_user(extns, &pt_count.counter, sizeof(int))) {
++        return -EFAULT;
++    }
++
++    if (copy_to_user(pages, &total_extents.counter, sizeof(int))) {
++        return -EFAULT;
++    }
 +    return 0;
 +}
 +
-+SYSCALL_DEFINE0(print_ex_pid) { // helper function to print some details
++// helper function to print some details
++// better to retain this if i wish to print more stuff in the future...
++SYSCALL_DEFINE0(print_ex_pid) {
 +    // https://ypl.coffee/parent-and-real-parent-in-task-struct/
++    printk("%s: pid: %d\n", __func__, current->pid);
++    printk("%s: tgid: %d\n", __func__, current->tgid);
++    printk("%s: peid: %lld\n", __func__, current->parent_exec_id);
++    printk("%s: seid: %lld\n", __func__, current->self_exec_id);
 +    printk("%s: current->pid: %d\n", __func__, task_pid_nr(current));
++    printk("%s: current->pid_nr: %d\n", __func__, pid_nr(task_pid(current)));
 +    printk("%s: current->real_parent->pid: %d\n", __func__,
 +           task_pid_nr(current->real_parent));
++    printk("%s: current->real_parent->pid_nr: %d\n", __func__,
++           pid_nr(task_pid(current->real_parent)));
 +    printk("%s: current->parent->pid: %d\n", __func__,
 +           task_pid_nr(current->parent));
++    printk("%s: current->real_parent->pid_nr: %d\n", __func__,
++           pid_nr(task_pid(current->parent)));
 +    return 0;
 +}

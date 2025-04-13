@@ -9,4 +9,4 @@ etest.o: test.c
 	$(CC) $^ -g -DUSE_SYSCALL -o $@ -lpthread
 
 clean:
-	rm -f test
+	rm -f test.o etest.o
