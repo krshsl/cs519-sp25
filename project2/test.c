@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <sys/mman.h>
 #include <sys/time.h>
 #include <string.h>
 #include <errno.h>
@@ -25,8 +26,8 @@
 
 // #define DEFAULT_BUF_SIZE    1048576
 #define DEFAULT_BUF_SIZE    409600
-#define MAX_ITERS           1
-#define MAX_PROCS           4
+#define MAX_ITERS           10000
+#define MAX_PROCS           16
 
 static long get_time_us(void) {
     struct timeval tv;
@@ -45,13 +46,13 @@ void *create_bufs(void *arg) {
     // }
 // #endif
     size_t *buf_size = (size_t*)arg;
-    char *buffer = (char *)malloc(*buf_size);
-    if (!buffer) {
-        perror("malloc");
+    char *buffer = (char *)mmap(NULL, *buf_size, PROT_READ | PROT_WRITE,
+                      MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+    if (buffer == MAP_FAILED) {
+        perror("mmap");
         return NULL;
     }
     memset(buffer, 4, *buf_size); // this should touch all pages...
-    memset(buffer, 1, *buf_size); // this should modify all pages...
     return buffer;
 }
 
@@ -66,6 +67,7 @@ void init_pages(size_t buf_size, int *extns, int *pages) {
     }
 #endif
     buffer = create_bufs(&buf_size);
+    memset(buffer, 1, buf_size); // this should modify all pages...
 #ifdef USE_SYSCALL
     if (syscall(sys_get_ex_count, extns, pages) < 0) {
         perror("syscall disable_extents (test)");
@@ -77,9 +79,8 @@ void init_pages(size_t buf_size, int *extns, int *pages) {
         exit(EXIT_FAILURE);
     }
 #endif
-    if (buffer) {
-        free(buffer);
-    } else {
+    if (buffer == NULL || munmap(buffer, buf_size) != 0) {
+        perror("buffer or munmap");
         exit(EXIT_FAILURE);
     }
 }
@@ -91,14 +92,16 @@ void repeat_oprs(int iter, size_t buf_size) {
     extns_cnt = pages_cnt = i = 0;
     extns = (int*)malloc(sizeof(int));
     pages = (int*)malloc(sizeof(int));
-    start_time = get_time_us();
     for (; i < iter; i++) {
+        start_time = get_time_us();
         init_pages(buf_size, extns, pages);
+        end_time = get_time_us();
+        total_time += (end_time - start_time);
+        // printf("%d::%d:%d\n", i, *extns, *pages);
         extns_cnt += *extns;
         pages_cnt += *pages;
     }
-    end_time = get_time_us();
-    total_time = (end_time - start_time)/iter;
+    total_time /= iter;
     free(extns);
     free(pages);
     printf("Total time: %Lf microseconds for %d iteration\n", total_time, iter);
@@ -144,8 +147,9 @@ void multi_oprs(size_t buf_size) {
     }
 #endif
     for (i = 0; i < MAX_PROCS; i++) {
-        if (buffers[i]) {
-            free(buffers[i]);
+        if (buffers[i] == NULL || munmap(buffers[i], buf_size) != 0) {
+            perror("buffer or munmap");
+            exit(EXIT_FAILURE);
         }
     }
     free(buffers);
@@ -172,8 +176,8 @@ int main(int argc, char **argv) {
     }
     printf("Using buffer size: %zu bytes\n", buf_size);
 
-    // repeat_oprs(1, buf_size);
-    // repeat_oprs(MAX_ITERS, buf_size);
+    repeat_oprs(1, buf_size);
+    repeat_oprs(MAX_ITERS, buf_size);
     multi_oprs(buf_size);
 
     return EXIT_SUCCESS;
