@@ -1,6 +1,6 @@
---- /dev/null	2025-04-12 22:31:40.536000551 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-12 22:50:56.244363154 -0600
-@@ -0,0 +1,349 @@
+--- /dev/null	2025-04-12 23:05:57.484000549 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-13 15:45:31.926136472 -0600
+@@ -0,0 +1,357 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
 +#include <linux/my_extent.h>
@@ -14,8 +14,7 @@
 +atomic_t pt_count;
 +atomic_t total_extents;
 +
-+raw_spinlock_t extents_lock;
-+DEFINE_RAW_SPINLOCK(extents_lock);
++DECLARE_RWSEM(extns_lock);
 +
 +// #define LOG_MY_FUNCS
 +
@@ -52,6 +51,7 @@
 +    struct rb_node *root;
 +    // int iter = 0;
 +    // LOG_FUNCS(KERN_DEBUG);
++    down_write(&extns_lock);
 +    while ((root = rb_first(&expg_root))) {
 +        struct rb_extns *node = rb_entry(root, struct rb_extns, pg_tree);
 +        // LPRINTK(KERN_DEBUG "%d:%zu::", iter++, node->count);
@@ -59,6 +59,7 @@
 +        free_pg_list(&node->p_node);
 +        kfree(node);
 +    }
++    up_write(&extns_lock);
 +}
 +
 +void print_pg_tree(void) {
@@ -96,7 +97,7 @@
 +    int result;
 +
 +    // LOG_FUNCS(KERN_DEBUG, "%lu", vma);
-+    raw_spin_lock(&extents_lock);
++    down_read(&extns_lock);
 +    while(cursor) {
 +        result = compare_pg(cursor, vma);
 +
@@ -111,7 +112,7 @@
 +    }
 +
 +    exit:
-+    raw_spin_unlock(&extents_lock);
++    up_read(&extns_lock);
 +    return node;
 +}
 +
@@ -122,7 +123,7 @@
 +    int result;
 +
 +    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", head->vma, head->pte);
-+    raw_spin_lock(&extents_lock);
++    down_write(&extns_lock);
 +    while(*cursor) {
 +        parent = *cursor;
 +        result = compare_pg(*cursor, head->vma);
@@ -141,7 +142,7 @@
 +    rb_insert_color(&data->pg_tree, &expg_root);
 +
 +    exit:
-+    raw_spin_unlock(&extents_lock);
++    up_write(&extns_lock);
 +    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", head->vma, head->pte);
 +}
 +
@@ -238,30 +239,30 @@
 +    if (front) {
 +        LOG_FUNCS(KERN_DEBUG, "list_add::%lu:%llu", vma, pte);
 +
-+        raw_spin_lock(&extents_lock);
++        down_write(&extns_lock);
 +        list_add(&new_node->pg_list, &front->p_node); // add to the front: head->next is now node
 +        front->count++;
-+        raw_spin_unlock(&extents_lock);
++        up_write(&extns_lock);
 +
 +        if (back) {
 +            LOG_FUNCS(KERN_DEBUG, "list_splice::%lu:%llu", vma, pte);
 +
-+            raw_spin_lock(&extents_lock);
++            down_write(&extns_lock);
 +            list_splice(&front->p_node, back->p_node.prev); // join front to end of back
-+            back->count += front->count;
 +            rb_erase(&front->pg_tree, &expg_root); // front has been removed, so better to remove this
-+            atomic_sub(1, &pt_count);
-+            raw_spin_unlock(&extents_lock);
++            back->count += front->count;
++            up_write(&extns_lock);
 +
++            atomic_sub(1, &pt_count); // this is an atomic operation anyways
 +            kfree(front);
 +        }
 +    } else if (back) {
 +        LOG_FUNCS(KERN_DEBUG, "list_add_tail::%lu:%llu", vma, pte);
 +
-+        raw_spin_lock(&extents_lock);
++        down_write(&extns_lock);
 +        list_add_tail(&new_node->pg_list, &back->p_node); // add to the rear: head->prev is now node
 +        back->count++;
-+        raw_spin_unlock(&extents_lock);
++        up_write(&extns_lock);
 +    } else {
 +        LOG_FUNCS(KERN_DEBUG, "create_extents::%lu:%llu", vma, pte);
 +
@@ -272,6 +273,7 @@
 +void handle_extents(unsigned long vma, unsigned long long pte) {
 +    struct rb_extns *node = NULL;
 +    pid_t pid = current->tgid;
++    // pid_t ppid = pid_nr(task_pid(current->real_parent)); // not required to handle this case
 +
 +    if (pid ==  do_extents_pid) {
 +        LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
@@ -306,7 +308,7 @@
 +
 +    // if your program quits prematurely, reboot your system to get this up and running again
 +    if (pid == do_extents_pid) {
-+        LOG_FUNCS(KERN_ALERT "%d had %d extents and %d pages", pid, pt_count.counter, total_extents.counter);
++        LOG_FUNCS(KERN_ALERT "%d had %d extents and %d pages", pid, atomic_read(pt_count), atomic_read(total_extents));
 +
 +        do_extents_pid = -1;
 +        atomic_set(&pt_count, 0);
@@ -320,11 +322,14 @@
 +}
 +
 +SYSCALL_DEFINE2(get_ex_count, int *, extns, int *, pages) {
-+    if (copy_to_user(extns, &pt_count.counter, sizeof(int))) {
++    int pt_counter = atomic_read(&pt_count);
++    int total_counter = atomic_read(&total_extents);
++
++    if (copy_to_user(extns, &pt_counter, sizeof(int))) {
 +        return -EFAULT;
 +    }
 +
-+    if (copy_to_user(pages, &total_extents.counter, sizeof(int))) {
++    if (copy_to_user(pages, &total_counter, sizeof(int))) {
 +        return -EFAULT;
 +    }
 +    return 0;
@@ -350,3 +355,6 @@
 +           pid_nr(task_pid(current->parent)));
 +    return 0;
 +}
++
++// https://amann.dev/blog/2024/mmap_dive/
++// vm_fault_t filemap_fault(struct vm_fault *vmf) - could handle extents as well!!
