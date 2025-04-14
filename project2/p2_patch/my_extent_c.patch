@@ -1,5 +1,5 @@
---- /dev/null	2025-04-14 07:08:29.080000570 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-14 07:40:46.759411865 -0600
+--- /dev/null	2025-04-14 12:09:26.980354989 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-14 12:36:07.253548765 -0600
 @@ -0,0 +1,415 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
@@ -308,7 +308,7 @@
 +void handle_extents(unsigned long vma, unsigned long pfn) {
 +    struct rb_node *proc_root = NULL;
 +    struct rb_procs *proc = NULL;
-+    struct rb_extns *node = NULL;
++    // struct rb_extns *node = NULL;
 +    pid_t tgid = current->tgid;
 +    unsigned long flags;
 +    pid_t pid;
@@ -335,9 +335,9 @@
 +
 +        // node = pg_search(proc, vma);
 +        // if (node) // update existing pages
-+            // update_pg_extns(node, vma, pfn);
++        //     update_pg_extns(node, vma, pfn);
 +        // else // add new pages
-+        add_extents(proc, vma, pfn); // ignoring update oprs since that is unlikely!!
++        add_extents(proc, vma, pfn); // ignoring update oprs since that is unlikely for our case!!
 +    }
 +}
 +EXPORT_SYMBOL(handle_extents);
