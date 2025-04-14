@@ -1,6 +1,6 @@
---- /dev/null	2025-04-13 22:20:12.824000561 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-13 22:04:21.149179464 -0600
-@@ -0,0 +1,414 @@
+--- /dev/null	2025-04-14 07:08:29.080000570 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-14 07:40:46.759411865 -0600
+@@ -0,0 +1,415 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
 +#include <linux/my_extent.h>
@@ -40,7 +40,7 @@
 +
 +    // LPRINTK(KERN_DEBUG "%s:%d::", __func__, __LINE__);
 +    list_for_each_entry_safe(curr, node, head, pg_list) {
-+        // LPRINTK(KERN_CONT "%lu:%llu,", curr->vma, curr->pte);
++        // LPRINTK(KERN_CONT "%lu:%lu,", curr->vma, curr->pfn);
 +        list_del(&curr->pg_list);
 +        kfree(curr);
 +    }
@@ -86,7 +86,7 @@
 +            LPRINTK(KERN_DEBUG "%s:%d::", __func__, __LINE__);
 +            LPRINTK(KERN_CONT "%d:%zu::", iter++, enode->count);
 +            list_for_each_entry(curr, &enode->p_node, pg_list) {
-+                LPRINTK(KERN_CONT "%lu:%llu,", curr->vma, curr->pte);
++                LPRINTK(KERN_CONT "%lu:%lu,", curr->vma, curr->pfn);
 +            }
 +            LPRINTK(KERN_CONT "\n");
 +        }
@@ -156,7 +156,7 @@
 +    struct rb_node *parent = NULL;
 +    int result;
 +
-+    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", head->vma, head->pte);
++    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", head->vma, head->pfn);
 +    // spin_lock(&proc->lock);
 +    while(*cursor) {
 +        parent = *cursor;
@@ -167,7 +167,7 @@
 +        else if(result == 1)
 +            cursor = &((*cursor)->rb_left);
 +        else {
-+            LOG_FUNCS(KERN_CRIT, "failing for some reason... %lu:%llu", head->vma, head->pte);
++            LOG_FUNCS(KERN_CRIT, "failing for some reason... %lu:%lu", head->vma, head->pfn);
 +            goto exit;
 +        }
 +    }
@@ -177,38 +177,39 @@
 +
 +    exit:
 +    // spin_unlock(&proc->lock);
-+    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", head->vma, head->pte);
++    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", head->vma, head->pfn);
++    return;
 +}
 +
-+struct list_extns *create_extn(unsigned long vma, unsigned long long pte) {
++struct list_extns *create_extn(unsigned long vma, unsigned long pfn) {
 +    struct list_extns *list_node = kmalloc(sizeof(struct list_extns), GFP_KERNEL);
-+    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
++    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
 +    INIT_LIST_HEAD(&list_node->pg_list);
 +    list_node->vma = vma;
-+    list_node->pte = pte;
++    list_node->pfn = pfn;
 +    atomic_add(1, &total_extents);
 +    return list_node;
 +}
 +
-+void update_pg_extns(struct rb_extns *rb_node, unsigned long vma, unsigned long long pte) {
++void update_pg_extns(struct rb_extns *rb_node, unsigned long vma, unsigned long pfn) {
 +    struct list_head *head = &rb_node->p_node;
 +    struct list_extns *node = NULL;
 +    struct list_head *pos = NULL;
 +    struct list_head *tmp = NULL;
 +
-+    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
++    LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
 +
 +    list_for_each_safe(pos, tmp, head) {
 +        node = list_entry(pos, struct list_extns, pg_list);
 +        if (node->vma != vma) continue;
-+        node->pte = pte;
++        node->pfn = pfn;
 +        break;
 +    }
 +}
 +
 +void create_extents(struct rb_procs *proc, struct list_extns *new_node) {
 +    struct rb_extns *rb_node = kmalloc(sizeof(struct rb_extns), GFP_KERNEL);
-+    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", new_node->vma, new_node->pte);
++    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", new_node->vma, new_node->pfn);
 +    rb_node->count = 1;
 +    INIT_LIST_HEAD(&rb_node->p_node);
 +    list_add(&new_node->pg_list, &rb_node->p_node);
@@ -216,62 +217,62 @@
 +    atomic_add(1, &pt_count);
 +}
 +
-+struct rb_extns *should_join_front(struct rb_procs *proc, unsigned long vma, unsigned long long pte) {
++struct rb_extns *should_join_front(struct rb_procs *proc, unsigned long vma, unsigned long pfn) {
 +    struct rb_extns *rb_node = NULL;
 +    struct list_extns *node = NULL;
 +
-+    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
++    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
 +    vma += PAGE_SIZE;
-+    pte += PAGE_SIZE;
++    pfn += PAGE_SIZE;
 +    rb_node = pg_search(proc, vma);
 +    if (rb_node == NULL) {
 +        return NULL;
 +    }
 +
-+    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
++    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
 +    node = list_first_entry(&rb_node->p_node, struct list_extns, pg_list);
-+    if (node->vma == vma && node->pte == pte) {
-+        // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", node->vma, node->pte);
++    if (node->vma == vma && node->pfn == pfn) {
++        // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", node->vma, node->pfn);
 +        return rb_node;
 +    }
 +
 +    return NULL;
 +}
 +
-+struct rb_extns *should_join_back(struct rb_procs *proc, unsigned long vma, unsigned long long pte) {
++struct rb_extns *should_join_back(struct rb_procs *proc, unsigned long vma, unsigned long pfn) {
 +    struct rb_extns *rb_node = NULL;
 +    struct list_extns *node = NULL;
 +
-+    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
++    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
 +    vma -= PAGE_SIZE;
-+    pte -= PAGE_SIZE;
++    pfn -= PAGE_SIZE;
 +    rb_node = pg_search(proc, vma);
 +    if (rb_node == NULL) {
 +        return NULL;
 +    }
 +
-+    // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
++    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
 +    node = list_last_entry(&rb_node->p_node, struct list_extns, pg_list);
-+    if (node->vma == vma && node->pte == pte) {
-+        // LOG_FUNCS(KERN_DEBUG, "%lu:%llu", node->vma, node->pte);
++    if (node->vma == vma && node->pfn == pfn) {
++        // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", node->vma, node->pfn);
 +        return rb_node;
 +    }
 +
 +    return NULL;
 +}
 +
-+void add_extents(struct rb_procs *proc, unsigned long vma, unsigned long long pte) {
++void add_extents(struct rb_procs *proc, unsigned long vma, unsigned long pfn) {
 +    struct list_extns *new_node = NULL;
 +    struct rb_extns *front = NULL;
 +    struct rb_extns *back = NULL;
 +
-+    LOG_FUNCS(KERN_DEBUG, "%lu:%llu", vma, pte);
-+    front = should_join_front(proc, vma, pte);
-+    back = should_join_back(proc, vma, pte);
-+    new_node = create_extn(vma, pte);
++    LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
++    front = should_join_front(proc, vma, pfn);
++    back = should_join_back(proc, vma, pfn);
++    new_node = create_extn(vma, pfn);
 +
 +    if (front) {
-+        LOG_FUNCS(KERN_DEBUG, "list_add::%lu:%llu", vma, pte);
++        LOG_FUNCS(KERN_DEBUG, "list_add::%lu:%lu", vma, pfn);
 +
 +        // spin_lock(&proc->lock);
 +        list_add(&new_node->pg_list, &front->p_node); // add to the front: head->next is now node
@@ -279,7 +280,7 @@
 +        // spin_unlock(&proc->lock);
 +
 +        if (back) {
-+            LOG_FUNCS(KERN_DEBUG, "list_splice::%lu:%llu", vma, pte);
++            LOG_FUNCS(KERN_DEBUG, "list_splice::%lu:%lu", vma, pfn);
 +
 +            // spin_lock(&proc->lock);
 +            list_splice(&front->p_node, back->p_node.prev); // join front to end of back
@@ -291,20 +292,20 @@
 +            kfree(front);
 +        }
 +    } else if (back) {
-+        LOG_FUNCS(KERN_DEBUG, "list_add_tail::%lu:%llu", vma, pte);
++        LOG_FUNCS(KERN_DEBUG, "list_add_tail::%lu:%lu", vma, pfn);
 +
 +        // spin_lock(&proc->lock);
 +        list_add_tail(&new_node->pg_list, &back->p_node); // add to the rear: head->prev is now node
 +        back->count++;
 +        // spin_unlock(&proc->lock);
 +    } else {
-+        LOG_FUNCS(KERN_DEBUG, "create_extents::%lu:%llu", vma, pte);
++        LOG_FUNCS(KERN_DEBUG, "create_extents::%lu:%lu", vma, pfn);
 +
 +        create_extents(proc, new_node);
 +    }
 +}
 +
-+void handle_extents(unsigned long vma, unsigned long long pte) {
++void handle_extents(unsigned long vma, unsigned long pfn) {
 +    struct rb_node *proc_root = NULL;
 +    struct rb_procs *proc = NULL;
 +    struct rb_extns *node = NULL;
@@ -314,7 +315,7 @@
 +
 +    if (tgid ==  do_extents_tgid) {
 +        pid = current->pid;
-+        LOG_FUNCS(KERN_DEBUG, "%d:%lu:%llu", pid, vma, pte);
++        LOG_FUNCS(KERN_DEBUG, "%d:%lu:%lu", pid, vma, pfn);
 +
 +        spin_lock_irqsave(&extns_lock, flags);
 +        proc_root = rb_find(&pid, &procs_tree, find_pids);
@@ -332,11 +333,11 @@
 +        }
 +
 +
-+        node = pg_search(proc, vma);
-+        if (node) // update existing pages
-+            update_pg_extns(node, vma, pte);
-+        else // add new pages
-+            add_extents(proc, vma, pte);
++        // node = pg_search(proc, vma);
++        // if (node) // update existing pages
++            // update_pg_extns(node, vma, pfn);
++        // else // add new pages
++        add_extents(proc, vma, pfn); // ignoring update oprs since that is unlikely!!
 +    }
 +}
 +EXPORT_SYMBOL(handle_extents);
