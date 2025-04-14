@@ -1,6 +1,6 @@
---- /dev/null	2025-04-12 22:31:40.536000551 -0600
-+++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-12 14:37:32.762326618 -0600
-@@ -0,0 +1,43 @@
+--- /dev/null	2025-04-13 22:20:12.824000561 -0600
++++ ../project2/linux-5.15.0/include/linux/my_extent.h	2025-04-13 22:24:53.100630668 -0600
+@@ -0,0 +1,53 @@
 +#ifndef _LINUX_MY_EX_H
 +#define _LINUX_MY_EX_H
 +
@@ -14,33 +14,43 @@
 +#include <linux/list.h>
 +
 +struct list_extns {
-+    struct list_head pg_list;
-+    unsigned long vma;
 +    unsigned long long pte;
++    unsigned long vma;
++    struct list_head pg_list;
 +};
 +
 +struct rb_extns {
-+    struct rb_node pg_tree;
-+    struct list_head p_node;
 +    size_t count;
++    struct list_head p_node;
++    struct rb_node pg_tree;
 +};
 +
-+extern pid_t do_extents_pid;
++struct rb_procs {
++    struct rb_root proc_extns;
++    struct rb_node procs_node;
++    pid_t pid;
++    // pid_t tgid; // unsure if this is required...
++    // spinlock_t lock; // maybe lock is not needed afterall??
++};
 +
 +void free_pg_list(struct list_head *head);
-+void free_pg_tree(void);
++void free_pg_tree(struct rb_root *root);
++void free_procs(void);
 +void print_pg_tree(void);
 +
++int find_pids(const void *key, const struct rb_node *node);
++bool add_pids(struct rb_node *node, const struct rb_node *parent);
++
 +int compare_pg(struct rb_node *cursor, unsigned long vma);
-+struct rb_extns *pg_search(struct rb_root *root, unsigned long vma);
-+void pg_insert(struct rb_extns *data);
++struct rb_extns *pg_search(struct rb_procs *proc, unsigned long vma);
++void pg_insert(struct rb_procs *proc, struct rb_extns *data);
 +
 +struct list_extns *create_extn(unsigned long vma, unsigned long long pte);
 +void update_pg_extns(struct rb_extns *rb_node, unsigned long vma, unsigned long long pte);
-+void create_extents(struct list_extns *new_node);
-+struct rb_extns *should_join_front(unsigned long vma, unsigned long long pte);
-+struct rb_extns *should_join_back(unsigned long vma, unsigned long long pte);
-+void add_extents(unsigned long vma, unsigned long long pte);
++void create_extents(struct rb_procs *proc, struct list_extns *new_node);
++struct rb_extns *should_join_front(struct rb_procs *proc, unsigned long vma, unsigned long long pte);
++struct rb_extns *should_join_back(struct rb_procs *proc, unsigned long vma, unsigned long long pte);
++void add_extents(struct rb_procs *proc, unsigned long vma, unsigned long long pte);
 +
 +#endif /* __KERNEL__ */
 +#endif /* _LINUX_MY_EX_H */

@@ -8,8 +8,8 @@ void perform_oprs(int threads, size_t buf_size) {
     int *extns, *pages, i;
     pthread_t *ptid = calloc(sizeof(pthread_t), threads);
     void **buffers = calloc(sizeof(void*), threads);
-    extns = (int*)malloc(sizeof(int));
-    pages = (int*)malloc(sizeof(int));
+    extns = (int*)calloc(sizeof(int), 1);
+    pages = (int*)calloc(sizeof(int), 1);
     start_time = get_time_us();
     init_extents();
     for (i = 0; i < threads; i++) {
