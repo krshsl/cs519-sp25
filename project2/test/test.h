@@ -48,7 +48,10 @@ void *create_bufs(void) {
 }
 
 void *set_bufs(void *arg) {
-    memset(arg, 4, buf_size); // this should touch all pages...
+    char *buffer = arg;
+    for (size_t j = 0, i = 49; i < buf_size; i+=getpagesize(), j = (j+1)%getpagesize()) { // touching a random page every time (almost)
+        buffer[i] = 4; // don't touch the page more than one time!!
+    }
 }
 
 void p_usage(char **argv, const char *opr) {
@@ -56,7 +59,7 @@ void p_usage(char **argv, const char *opr) {
     printf("example: %s 5 4096\n", argv[0]);
 }
 
-void init_extents() {
+void init_extents(void) {
 #ifdef USE_SYSCALL
     if (syscall(sys_enable_extents) < 0) {
         perror("syscall enable_extents (test)");
