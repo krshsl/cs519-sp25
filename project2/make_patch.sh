@@ -11,9 +11,7 @@ if [ -d "$outdir" ]; then
     mkdir $outdir
 fi
 
-p21=../project2/linux-5.15.0
-patch_dirs=(arch/x86/entry/syscalls/syscall_64.tbl include/linux/syscalls.h include/linux/mm.h mm/memory.c mm/Makefile)
-out_dirs=(syscall_64.patch syscall_h.patch mm_h.patch memory_c.patch mm_makefile.patch)
+. ./set_patch_env.sh
 for i in ${!patch_dirs[@]}
 do
     pF="${p21}/${patch_dirs[i]}"
