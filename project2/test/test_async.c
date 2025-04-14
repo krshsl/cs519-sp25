@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <test.h>
 
-void perform_oprs(int threads, size_t buf_size) {
+size_t buf_size = DEFAULT_BUF_SIZE;
+
+void perform_oprs(int threads) {
     long start_time, end_time;
     long double total_time;
     int *extns, *pages, i;
@@ -10,23 +12,21 @@ void perform_oprs(int threads, size_t buf_size) {
     void **buffers = calloc(sizeof(void*), threads);
     extns = (int*)calloc(sizeof(int), 1);
     pages = (int*)calloc(sizeof(int), 1);
+    for (i = 0; i < threads; i++) {
+        buffers[i] = create_bufs();
+    }
     start_time = get_time_us();
     init_extents();
     for (i = 0; i < threads; i++) {
-        pthread_create(&ptid[i], NULL, &create_bufs, &buf_size);
+        pthread_create(&ptid[i], NULL, &set_bufs, buffers[i]);
     }
     for (i = 0; i < threads; i++) {
-        pthread_join(ptid[i], &buffers[i]);
+        pthread_join(ptid[i], NULL);
     }
     free_extents(extns, pages);
     end_time = get_time_us();
     total_time = (end_time - start_time);
-    printf("Total time: %Lf microseconds for %d threads\n", total_time, threads);
-    printf("Average time: %Lf microseconds for %d each thread\n", total_time/threads, threads);
-#ifdef USE_SYSCALL
-    printf("For %d threads: %d extents and %d pages were used in total\n", threads, *extns, *pages);
-    printf("For %d threads: %d extents and %d pages were used on average\n", threads, (*extns)/threads, (*pages)/threads);
-#endif
+    print_output(*extns, *pages, total_time, threads, "threads");
     for (i = 0; i < threads; i++) {
         if (!buffers[i] || munmap(buffers[i], buf_size) != 0) {
             fprintf(stderr, "Error in buffer...");
@@ -41,7 +41,6 @@ void perform_oprs(int threads, size_t buf_size) {
 
 int main(int argc, char **argv) {
     int threads;
-    size_t buf_size = DEFAULT_BUF_SIZE;
 
     if (argc == 1) {
         p_usage(argv, "threads");
@@ -57,11 +56,10 @@ int main(int argc, char **argv) {
             buf_size = (size_t)atoi(argv[2]);
             if (buf_size == 0) {
                 fprintf(stderr, "Invalid buffer size provided. Using default %d bytes.\n", DEFAULT_BUF_SIZE);
-                buf_size = DEFAULT_BUF_SIZE;
             }
         }
     }
     printf("Using buffer size: %zu bytes and running on %d threads.\n", buf_size, threads);
-    perform_oprs(threads, buf_size);
+    perform_oprs(threads);
     return EXIT_SUCCESS;
 }

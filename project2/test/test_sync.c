@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <test.h>
 
-void perform_oprs(int iter, size_t buf_size) {
+size_t buf_size = DEFAULT_BUF_SIZE;
+
+void perform_oprs(int iter) {
     int *extns_cnt, *pages_cnt, extns, pages, i;
     long start_time, end_time;
     long double total_time;
@@ -11,9 +13,10 @@ void perform_oprs(int iter, size_t buf_size) {
     i = extns = pages = 0;
     total_time = 0;
     for (; i < iter; i++) {
+        buffer = create_bufs();
         start_time = get_time_us();
         init_extents();
-        buffer = create_bufs(&buf_size);
+        set_bufs(buffer);
         free_extents(extns_cnt, pages_cnt);
         end_time = get_time_us();
         extns += *extns_cnt;
@@ -25,19 +28,13 @@ void perform_oprs(int iter, size_t buf_size) {
             exit(EXIT_FAILURE);
         }
     }
-    printf("Total time: %Lf microseconds for %d iteration\n", total_time, iter);
-    printf("Average time: %Lf microseconds for %d iteration\n", total_time/iter, iter);
-#ifdef USE_SYSCALL
-    printf("For %d iterations: %d extents and %d pages were used in total\n", iter, extns, pages);
-    printf("For %d iterations: %d extents and %d pages were used on average\n", iter, extns/iter, pages/iter);
-#endif
+    print_output(extns, pages, total_time, iter, "iterations");
     free(extns_cnt);
     free(pages_cnt);
 }
 
 int main(int argc, char **argv) {
     int iter;
-    size_t buf_size = DEFAULT_BUF_SIZE;
 
     if (argc == 1) {
         p_usage(argv, "operations");
@@ -53,11 +50,10 @@ int main(int argc, char **argv) {
             buf_size = (size_t)atoi(argv[2]);
             if (buf_size == 0) {
                 fprintf(stderr, "Invalid buffer size provided. Using default %d bytes.\n", DEFAULT_BUF_SIZE);
-                buf_size = DEFAULT_BUF_SIZE;
             }
         }
     }
     printf("Using buffer size: %zu bytes and performing %d operations.\n", buf_size, iter);
-    perform_oprs(iter, buf_size);
+    perform_oprs(iter);
     return EXIT_SUCCESS;
 }
