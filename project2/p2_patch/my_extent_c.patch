@@ -1,5 +1,5 @@
---- /dev/null	2025-04-14 12:09:26.980354989 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-14 12:36:07.253548765 -0600
+--- /dev/null	2025-04-14 15:47:07.448000548 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-14 16:09:03.187788015 -0600
 @@ -0,0 +1,415 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
@@ -223,7 +223,7 @@
 +
 +    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
 +    vma += PAGE_SIZE;
-+    pfn += PAGE_SIZE;
++    pfn += 1; // offset shouldn't matter
 +    rb_node = pg_search(proc, vma);
 +    if (rb_node == NULL) {
 +        return NULL;
@@ -245,7 +245,7 @@
 +
 +    // LOG_FUNCS(KERN_DEBUG, "%lu:%lu", vma, pfn);
 +    vma -= PAGE_SIZE;
-+    pfn -= PAGE_SIZE;
++    pfn -= 1; // offset shouldn't matter
 +    rb_node = pg_search(proc, vma);
 +    if (rb_node == NULL) {
 +        return NULL;
@@ -315,7 +315,7 @@
 +
 +    if (tgid ==  do_extents_tgid) {
 +        pid = current->pid;
-+        LOG_FUNCS(KERN_DEBUG, "%d:%lu:%lu", pid, vma, pfn);
++        LOG_FUNCS(KERN_DEBUG, "%d:%d::%lu:%lu:%lu\n", tgid, pid, vma, pfn, actvma);
 +
 +        spin_lock_irqsave(&extns_lock, flags);
 +        proc_root = rb_find(&pid, &procs_tree, find_pids);
