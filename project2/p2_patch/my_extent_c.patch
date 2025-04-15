@@ -1,5 +1,5 @@
---- /dev/null	2025-04-14 15:47:07.448000548 -0600
-+++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-14 16:09:03.187788015 -0600
+--- /dev/null	2025-04-14 20:27:42.776000559 -0600
++++ ../project2/linux-5.15.0/mm/my_extent.c	2025-04-14 20:35:59.391273319 -0600
 @@ -0,0 +1,415 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
@@ -315,7 +315,7 @@
 +
 +    if (tgid ==  do_extents_tgid) {
 +        pid = current->pid;
-+        LOG_FUNCS(KERN_DEBUG, "%d:%d::%lu:%lu:%lu\n", tgid, pid, vma, pfn, actvma);
++        LOG_FUNCS(KERN_DEBUG, "%d:%d::%lu:%lu\n", tgid, pid, vma, pfn);
 +
 +        spin_lock_irqsave(&extns_lock, flags);
 +        proc_root = rb_find(&pid, &procs_tree, find_pids);
