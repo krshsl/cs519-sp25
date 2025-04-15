@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -37,9 +38,10 @@ static long get_time_us(void) {
 
 extern size_t buf_size;
 
-void *create_bufs(void) {
-    char *buffer = (char *)mmap(NULL, buf_size, PROT_READ | PROT_WRITE,
-                      MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+void *create_bufs(int fd) {
+    // https://stackoverflow.com/a/26259596
+    char *buffer = (char *)mmap(0, buf_size, PROT_READ | PROT_WRITE,
+                      MAP_PRIVATE | MAP_ANONYMOUS, fd, 0);
     if (buffer == MAP_FAILED) {
         perror("mmap");
         exit(EXIT_FAILURE);
@@ -85,11 +87,28 @@ void free_extents(int *extns, int *pages) {
 #endif
 }
 
-void print_output(int extns, int pages, long double total_time, int count, const char *opr) {
-    printf("Total time: %Lf microseconds for %d %s\n", total_time, count, opr);
-    printf("Average time: %Lf microseconds for %d %s\n", (total_time/count), count, opr);
+
+struct output {
+    int count;
+    int extns;
+    int pages;
+    const char *opr;
+    long double total_time;
+};
+
+void print_output(struct output op) {
+#ifndef MINPRINT
+    printf("Total time: %Lf microseconds for %d %s\n", op.total_time, op.count, op.opr);
+    printf("Average time: %Lf microseconds for %d %s\n", (op.total_time/op.count), op.count, op.opr);
 #ifdef USE_SYSCALL
-    printf("For %d %s: %d extents and %d pages were used in total\n", count, opr, extns, pages);
-    printf("For %d %s: %d extents and %d pages were used on average\n", count, opr, (extns/count), (pages/count));
-#endif
+    printf("For %d %s: %d extents and %d pages were used in total\n", op.count, op.opr, op.extns, op.pages);
+    printf("For %d %s: %d extents and %d pages were used on average\n", op.count, op.opr, (op.extns/op.count), (op.pages/op.count));
+#endif /* USE_SYSCALL */
+#else
+#ifdef USE_SYSCALL
+    printf("%d,%Lf,%Lf,%d,%d,%d,%d\n",op.count,op.total_time,(op.total_time/op.count),op.extns,op.pages,(op.extns/op.count),(op.pages/op.count));
+#else
+    printf("%d,%Lf,%Lf\n",op.count,op.total_time,(op.total_time/op.count));
+#endif /* USE_SYSCALL */
+#endif /* MINPRINT */
 }

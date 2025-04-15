@@ -4,38 +4,98 @@
 
 size_t buf_size = DEFAULT_BUF_SIZE;
 
-void perform_oprs(int threads) {
+void create_join_threads(pthread_t *ptid, void **buffers, struct output *op) {
+    int *extns_cnt, *pages_cnt, i;
     long start_time, end_time;
-    long double total_time;
-    int *extns, *pages, i;
-    pthread_t *ptid = calloc(sizeof(pthread_t), threads);
-    void **buffers = calloc(sizeof(void*), threads);
-    extns = (int*)calloc(sizeof(int), 1);
-    pages = (int*)calloc(sizeof(int), 1);
-    for (i = 0; i < threads; i++) {
-        buffers[i] = create_bufs();
+#ifdef IS_FILE
+    #define FILEPATH "/tmp/mmapped.bin"
+    int *fd, result, len;
+    char **filepath;
+    char str[32];
+    fd = calloc(sizeof(int), op->count);
+    filepath = calloc(sizeof(char*), op->count);
+#endif
+    extns_cnt = (int*)calloc(sizeof(int), 1);
+    pages_cnt = (int*)calloc(sizeof(int), 1);
+    for (i = 0; i < op->count; i++) {
+#ifndef IS_FILE
+        buffers[i] = create_bufs(0);
+#else
+    memset(str, 0, 32);
+    sprintf(str, "%d", i);
+    len = sizeof(FILEPATH) + strlen(str);
+    filepath[i] = malloc(len);
+    strcpy(filepath[i], FILEPATH);
+    strncpy(filepath[i]+(sizeof(FILEPATH)-1), str, strlen(str));
+    filepath[i][len-1] = '\0';
+    fd[i] = open(filepath[i], O_RDWR | O_CREAT | O_TRUNC, (mode_t)0777);
+    if (fd[i] == -1) {
+    	perror("Error opening file for writing");
+    	exit(EXIT_FAILURE);
+    }
+
+    result = lseek(fd[i], buf_size-1, SEEK_SET);
+    if (result == -1) {
+       	close(fd[i]);
+    	perror("Error calling lseek() to 'stretch' the file");
+    	exit(EXIT_FAILURE);
+    }
+
+    result = write(fd[i], "", 1);
+    if (result != 1) {
+    	close(fd[i]);
+    	perror("Error writing last byte of the file");
+    	exit(EXIT_FAILURE);
+    }
+    buffers[i] = create_bufs(fd[i]);
+#endif
     }
     start_time = get_time_us();
     init_extents();
-    for (i = 0; i < threads; i++) {
+    for (i = 0; i < op->count; i++) {
         pthread_create(&ptid[i], NULL, &set_bufs, buffers[i]);
     }
-    for (i = 0; i < threads; i++) {
+    for (i = 0; i < op->count; i++) {
         pthread_join(ptid[i], NULL);
     }
-    free_extents(extns, pages);
+    free_extents(extns_cnt, pages_cnt);
     end_time = get_time_us();
-    total_time = (end_time - start_time);
-    print_output(*extns, *pages, total_time, threads, "threads");
-    for (i = 0; i < threads; i++) {
+    op->extns = *extns_cnt;
+    op->pages = *pages_cnt;
+    op->total_time = (end_time - start_time);
+    free(extns_cnt);
+    free(pages_cnt);
+    for (i = 0; i < op->count; i++) {
         if (!buffers[i] || munmap(buffers[i], buf_size) != 0) {
             fprintf(stderr, "Error in buffer...");
             exit(EXIT_FAILURE);
         }
+#ifdef IS_FILE
+        close(fd[i]);
+        remove(filepath[i]);
+        free(filepath[i]);
+#endif
     }
+#ifdef IS_FILE
+    free(fd);
+    free(filepath);
+#endif
+}
+
+void perform_oprs(int threads) {
+    long start_time, end_time;
+    pthread_t *ptid = calloc(sizeof(pthread_t), threads);
+    void **buffers = calloc(sizeof(void*), threads);
+    struct output op = {
+        .extns = 0,
+        .pages = 0,
+        .count = threads,
+        .opr = "iterations",
+        .total_time = 0
+    };
+    create_join_threads(ptid, buffers, &op);
+    print_output(op);
     free(buffers);
-    free(extns);
-    free(pages);
     free(ptid);
 }
 
@@ -59,7 +119,9 @@ int main(int argc, char **argv) {
             }
         }
     }
+#ifndef MINPRINT
     printf("Using buffer size: %zu bytes and running on %d threads.\n", buf_size, threads);
+#endif
     perform_oprs(threads);
     return EXIT_SUCCESS;
 }

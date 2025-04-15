@@ -3,32 +3,68 @@
 
 size_t buf_size = DEFAULT_BUF_SIZE;
 
-void perform_oprs(int iter) {
-    int *extns_cnt, *pages_cnt, extns, pages, i;
+void perform_iter(int *extns_cnt, int *pages_cnt, struct output *op) {
     long start_time, end_time;
-    long double total_time;
-    void *buffer;
+#ifndef IS_FILE
+    void *buffer = create_bufs(0);
+#else
+    const char *filepath = "/tmp/mmapped.bin";
+    int fd, result;
+    fd = open(filepath, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0777);
+    if (fd == -1) {
+    	perror("Error opening file for writing");
+    	exit(EXIT_FAILURE);
+    }
+
+    result = lseek(fd, buf_size-1, SEEK_SET);
+    if (result == -1) {
+    	close(fd);
+    	perror("Error calling lseek() to 'stretch' the file");
+    	exit(EXIT_FAILURE);
+    }
+
+    result = write(fd, "", 1);
+    if (result != 1) {
+    	close(fd);
+    	perror("Error writing last byte of the file");
+    	exit(EXIT_FAILURE);
+    }
+    void *buffer = create_bufs(fd);
+#endif
+    start_time = get_time_us();
+    init_extents();
+    set_bufs(buffer);
+    free_extents(extns_cnt, pages_cnt);
+    end_time = get_time_us();
+    op->extns += *extns_cnt;
+    op->pages += *pages_cnt;
+    op->total_time += (end_time - start_time);
+    if (!buffer || munmap(buffer, buf_size) != 0) {
+        fprintf(stderr, "Error in buffer...");
+        exit(EXIT_FAILURE);
+    }
+#ifdef IS_FILE
+    close(fd);
+    remove(filepath);
+#endif
+}
+
+
+void perform_oprs(int iter) {
+    int *extns_cnt, *pages_cnt, i;
+    struct output op = {
+        .extns = 0,
+        .pages = 0,
+        .count = iter,
+        .opr = "iterations",
+        .total_time = 0
+    };
     extns_cnt = (int*)malloc(sizeof(int));
     pages_cnt = (int*)malloc(sizeof(int));
-    i = extns = pages = 0;
-    total_time = 0;
-    for (; i < iter; i++) {
-        buffer = create_bufs();
-        start_time = get_time_us();
-        init_extents();
-        set_bufs(buffer);
-        free_extents(extns_cnt, pages_cnt);
-        end_time = get_time_us();
-        extns += *extns_cnt;
-        pages += *pages_cnt;
-        total_time += (end_time - start_time);
-
-        if (!buffer || munmap(buffer, buf_size) != 0) {
-            fprintf(stderr, "Error in buffer...");
-            exit(EXIT_FAILURE);
-        }
+    for (i = 0; i < iter; i++) {
+        perform_iter(extns_cnt, pages_cnt, &op);
     }
-    print_output(extns, pages, total_time, iter, "iterations");
+    print_output(op);
     free(extns_cnt);
     free(pages_cnt);
 }
@@ -53,7 +89,9 @@ int main(int argc, char **argv) {
             }
         }
     }
+#ifndef MINPRINT
     printf("Using buffer size: %zu bytes and performing %d operations.\n", buf_size, iter);
+#endif
     perform_oprs(iter);
     return EXIT_SUCCESS;
 }
