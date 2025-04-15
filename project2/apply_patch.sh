@@ -4,7 +4,7 @@ for i in ${!patch_dirs[@]}
 do
     pF="${p21}/${patch_dirs[i]}"
     echo "${pF}"
-    if [ -f "${pF}.orig" ]; then
+    if [ ! -f "${pF}.orig" ]; then
         cp "${pF}" "${pF}.orig"
     fi
     cp "${pF}.orig" "${pF}.orig1"
