@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.lines import Line2D
 
+mfolders = ["mmap", "fmap"]
 
 def read_data():
-    mfolders = ["mmap", "fmap"]
-    buf_sizes = ["4096", "65536", "1048576", "16777216", "268435456"]
-    threads = ["1", "2", "4", "8", "16", "32", "64"]
+    buf_sizes = [4096, 65536, 1048576, 16777216, 268435456]
+    threads = [1, 2, 4, 8, 16, 32, 64]
 
     all_est_data = []
     all_st_data = []
@@ -16,7 +16,7 @@ def read_data():
     for mf in mfolders:
         for buf in buf_sizes:
             for th in threads:
-                path = os.path.join(mf, buf, th)
+                path = os.path.join(mf, str(buf), str(th))
                 est_file = os.path.join(path, "est.csv")
                 st_file = os.path.join(path, "st.csv")
 
@@ -25,7 +25,7 @@ def read_data():
                         "thread", "totaltime", "avgtime", "totalext", "totalpage", "avgext", "avgpage"])
                     est_df["mfolder"] = mf
                     est_df["buf_size"] = buf
-                    if len(est_df) == 2:
+                    if len(est_df) == 2: # added to check using subset of data
                         est_df = pd.concat([est_df]*500, ignore_index=True)
                     all_est_data.append(est_df)
 
@@ -34,7 +34,7 @@ def read_data():
                         "thread", "totaltime", "avgtime"])
                     st_df["mfolder"] = mf
                     st_df["buf_size"] = buf
-                    if len(st_df) == 2:
+                    if len(st_df) == 2: # added to check using subset of data
                         st_df = pd.concat([st_df]*500, ignore_index=True)
                     all_st_data.append(st_df)
 
@@ -49,7 +49,7 @@ def plot_3d_graphs(est_df, st_df):
         "large": [16777216, 268435456]
     }
 
-    for mf in ["mmap", "fmap"]:
+    for mf in mfolders:
         for group_name, buffers in buf_groups.items():
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
@@ -90,9 +90,9 @@ def plot_3d_graphs(est_df, st_df):
 
 
 def plot_extents_graph(est_df):
-    buf_set = ["1048576", "16777216", "268435456"]
+    buf_set = [1048576, 16777216, 268435456]
 
-    for mf in ["mmap", "fmap"]:
+    for mf in mfolders:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
@@ -123,7 +123,7 @@ def plot_extents_graph(est_df):
 def plot_cdn_log_extents(est_df):
     buf_set = [16777216, 268435456]
 
-    for mf in ["mmap", "fmap"]:
+    for mf in mfolders:
         fig, ax = plt.subplots()
         subset = est_df[(est_df["mfolder"] == mf) & (est_df["buf_size"].astype(int).isin(buf_set))]
         subset = subset.copy()
