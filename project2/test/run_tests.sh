@@ -5,7 +5,7 @@ buf_sizes=(4096 65536 1048576 16777216 268435456)
 threads=(2 4 8 16 32 64)
 
 run_sim() {
-    iters=5000
+    iters=1000
     src=../../../
     stat="sudo perf stat -e faults -r $iters --table --output"
     for buf in ${buf_sizes[@]}
@@ -29,20 +29,22 @@ run_sim() {
     done
 }
 
+mmap=mmap
 echo "running mmap fault"
 make clean
 make MIN_PRINT=1 -j 16 all
-rm -rf mmap
-mkdir mmap
-cd mmap
+rm -rf $mmap
+mkdir $mmap
+cd $mmap
 run_sim
 cd ..
 
+fmap=fmap
 echo "running fmap fault"
 make clean
 make MIN_PRINT=1 IS_FILE=1 -j 16 all
-rm -rf fmap
-mkdir fmap
-cd fmap
+rm -rf $fmap
+mkdir $fmap
+cd $fmap
 run_sim
 cd ..
