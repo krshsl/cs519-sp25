@@ -39,7 +39,13 @@ void perform_iter(int *extns_cnt, int *pages_cnt, struct output *op) {
     op->extns += *extns_cnt;
     op->pages += *pages_cnt;
     op->total_time += (end_time - start_time);
-    if (!buffer || munmap(buffer, buf_size) != 0) {
+    if (!buffer) {
+        fprintf(stderr, "Error in buffer...");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(buffer, 0, buf_size);
+    if (munmap(buffer, buf_size) != 0) {
         fprintf(stderr, "Error in buffer...");
         exit(EXIT_FAILURE);
     }

@@ -66,7 +66,13 @@ void create_join_threads(pthread_t *ptid, void **buffers, struct output *op) {
     free(extns_cnt);
     free(pages_cnt);
     for (i = 0; i < op->count; i++) {
-        if (!buffers[i] || munmap(buffers[i], buf_size) != 0) {
+        if (!buffers[i]) {
+            fprintf(stderr, "Error in buffer...");
+            exit(EXIT_FAILURE);
+        }
+
+        memset(buffers[i], 0, buf_size);
+        if (munmap(buffers[i], buf_size) != 0) {
             fprintf(stderr, "Error in buffer...");
             exit(EXIT_FAILURE);
         }
