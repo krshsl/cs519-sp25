@@ -57,32 +57,32 @@ def plot_3d_graphs(est_df, st_df):
             handles = []
             labels = []
 
-            for label, df, color in [("est", est_df, 'blue'), ("st", st_df, 'red')]:
+            unique_threads = sorted(est_df["thread"].unique())
+            thread_map = {t: i * 4 for i, t in enumerate(unique_threads)}
+            for label, df, color in [("Extents", est_df, 'lightgreen'), ("Normal", st_df, 'teal')]:
                 subset = df[(df["mfolder"] == mf) & (df["buf_size"].astype(int).isin(buffers))]
                 subset = subset.copy()
                 subset["buf_size"] = subset["buf_size"].astype(int)
                 subset["thread"] = subset["thread"].astype(int)
 
-                unique_threads = sorted(subset["thread"].unique())
-                thread_map = {t: i * 4 for i, t in enumerate(unique_threads)}
                 subset["thread_stretched"] = subset["thread"].map(thread_map)
 
-                pivot = subset.pivot_table(index="thread_stretched", columns="buf_size", values="avgtime", aggfunc='mean')
+                pivot = subset.pivot_table(index="buf_size", columns="thread_stretched", values="avgtime", aggfunc='mean')
                 X, Y = np.meshgrid(pivot.columns, pivot.index)
                 Z = pivot.values
 
                 surf = ax.plot_surface(X, Y, Z, color=color, alpha=0.7)
                 handles.append(Line2D([0], [0], color=color, lw=4))
-                labels.append(label.upper())
+                labels.append(label)
 
-            for yval in thread_map.values():
-                ax.plot([X.min(), X.max()], [yval, yval], [Z.min(), Z.min()], 'k--', linewidth=0.5)
+            for xval in thread_map.values():
+                ax.plot([xval, xval], [Y.min(), Y.max()], [Z.min(), Z.min()], 'k--', linewidth=0.5)
 
-            ax.set_xlabel("Buffer Size")
-            ax.set_ylabel("Threads")
-            ax.set_yticks(list(thread_map.values()))
-            ax.set_yticklabels(list(thread_map.keys()))
-            ax.set_zlabel("Avg Time")
+            ax.set_ylabel("Buffer Size")
+            ax.set_xlabel("Threads")
+            ax.set_xticks(list(thread_map.values()))
+            ax.set_xticklabels(list(thread_map.keys()))
+            ax.set_zlabel("Avg Time (μs)")
             ax.set_title(f"{mf.upper()} - {group_name.capitalize()} Buffers")
             ax.legend(handles, labels, loc='best')
             plt.savefig(f"{mf}_{group_name}_avgtime_surface.png")
@@ -90,7 +90,7 @@ def plot_3d_graphs(est_df, st_df):
 
 
 def plot_extents_graph(est_df):
-    buf_set = [1048576, 16777216, 268435456]
+    buf_set = [16777216, 268435456]
 
     for mf in mfolders:
         fig = plt.figure()
@@ -103,57 +103,57 @@ def plot_extents_graph(est_df):
 
         unique_threads = sorted(subset["thread"].unique())
         thread_map = {t: i * 4 for i, t in enumerate(unique_threads)}
+        buf_map = {b: i * 4 for i, b in enumerate(buf_set)}
         subset["thread_stretched"] = subset["thread"].map(thread_map)
+        subset["bufs_stretched"] = subset["buf_size"].map(buf_map)
 
-        pivot = subset.pivot_table(index="thread_stretched", columns="buf_size", values="totalext", aggfunc='mean')
+        pivot = subset.pivot_table(index="bufs_stretched", columns="thread_stretched", values="avgext", aggfunc='mean')
         X, Y = np.meshgrid(pivot.columns, pivot.index)
         Z = pivot.values
 
-        surf = ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.8)
+        surf = ax.plot_surface(X, Y, Z, cmap='inferno', alpha=0.75)
 
-        ax.set_xlabel("Buffer Size")
-        ax.set_ylabel("Threads")
-        ax.set_yticks(sorted(subset["thread_stretched"].unique()))
-        ax.set_zlabel("Total Extents")
+        ax.set_ylabel("Buffer Size")
+        ax.set_yticks(list(buf_map.values()))
+        ax.set_yticklabels(list(buf_map.keys()))
+        ax.set_xlabel("Threads")
+        ax.set_xticks(list(thread_map.values()))
+        ax.set_xticklabels(list(thread_map.keys()))
+        ax.set_zlabel("Avg Extents")
         ax.set_title(f"{mf.upper()} - Selected Buffers - Extents")
         plt.savefig(f"{mf}_selected_extents_surface.png")
         plt.close()
 
 
-def plot_log_extents(est_df):
-    buf_set = [16777216, 268435456]
+def plot_cdf(est_df):
+    buf_sizes = [16777216, 268435456]
+    threads = sorted(est_df["thread"].unique())
 
-    for mf in mfolders:
-        fig, ax = plt.subplots()
-        subset = est_df[(est_df["mfolder"] == mf) & (est_df["buf_size"].astype(int).isin(buf_set))]
-        subset = subset.copy()
-        subset["buf_size"] = subset["buf_size"].astype(int)
-        subset["thread"] = subset["thread"].astype(int)
+    for buf in buf_sizes:
+        plt.figure()
+        for th in threads:
+            subset = est_df[
+                (est_df["mfolder"] == "mmap") &
+                (est_df["buf_size"] == buf) &
+                (est_df["thread"] == th)
+            ]
+            if subset.empty:
+                continue
 
-        unique_threads = sorted(subset["thread"].unique())
-        thread_map = {t: i * 4 for i, t in enumerate(unique_threads)}
-        subset["thread_stretched"] = subset["thread"].map(thread_map)
+            data = np.sort(subset["avgext"].values)
+            cdf = np.arange(1, len(data)+1) / len(data)
+            plt.plot(data, cdf, label=str(th) + " threads")
 
-        for buf in sorted(subset["buf_size"].unique()):
-            buf_df = subset[subset["buf_size"] == buf]
-            grouped = buf_df.groupby("thread_stretched")["totalext"].mean()
-            reverse_log = np.log1p(1 / (grouped.values + 1e-5))
-            ax.plot(reverse_log, grouped.index, label=f"Buf {buf}")
-
-        for yval in thread_map.values():
-            ax.axhline(y=yval, color='gray', linestyle='--', linewidth=0.5)
-
-        ax.set_ylabel("Threads")
-        ax.set_yticks(list(thread_map.values()))
-        ax.set_yticklabels(list(thread_map.keys()))
-        ax.set_xlabel("log(1 + 1 / Total Extents)")
-        ax.set_title(f"{mf.upper()} - Threads vs log(1 + 1 / Extents)")
-        ax.legend(title="Buffer Size")
-        plt.savefig(f"{mf}_log1_inv_extents_vs_threads.png")
+        plt.xlabel("Total Extents")
+        plt.ylabel("CDF")
+        plt.title("CDF for mmap - Buffer Size " + str(buf))
+        plt.legend()
+        plt.grid(True)
+        plt.savefig("cdf_mmap_buf_" + str(buf) + ".png")
         plt.close()
 
 if __name__ == "__main__":
     est_df, st_df = read_data()
     plot_3d_graphs(est_df, st_df)
     plot_extents_graph(est_df)
-    plot_log_extents(est_df)
+    plot_cdf(est_df)
