@@ -9,5 +9,5 @@ linux-headers-5.15.0*
 .vscode/settings.json
 .zed/settings.json
 
-project2/test/fmap
-project2/test/mmap
+project2/test/*fmap*
+project2/test/*mmap*
