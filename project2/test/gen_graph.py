@@ -120,7 +120,7 @@ def plot_extents_graph(est_df):
         plt.close()
 
 
-def plot_cdn_log_extents(est_df):
+def plot_log_extents(est_df):
     buf_set = [16777216, 268435456]
 
     for mf in mfolders:
@@ -147,14 +147,13 @@ def plot_cdn_log_extents(est_df):
         ax.set_yticks(list(thread_map.values()))
         ax.set_yticklabels(list(thread_map.keys()))
         ax.set_xlabel("log(1 + 1 / Total Extents)")
-        ax.set_title(f"Reverse CDN: {mf.upper()} - Threads vs log(1 + 1 / Extents)")
+        ax.set_title(f"{mf.upper()} - Threads vs log(1 + 1 / Extents)")
         ax.legend(title="Buffer Size")
-        plt.savefig(f"reverse_cdn_{mf}_log1_inv_extents_vs_threads.png")
+        plt.savefig(f"{mf}_log1_inv_extents_vs_threads.png")
         plt.close()
-
 
 if __name__ == "__main__":
     est_df, st_df = read_data()
     plot_3d_graphs(est_df, st_df)
     plot_extents_graph(est_df)
-    plot_cdn_log_extents(est_df)
+    plot_log_extents(est_df)
