@@ -19,7 +19,7 @@ void create_join_threads(pthread_t *ptid, void **buffers, struct output *op) {
     pages_cnt = (int*)calloc(sizeof(int), 1);
     for (i = 0; i < op->count; i++) {
 #ifndef IS_FILE
-        buffers[i] = create_bufs(0);
+        buffers[i] = create_bufs(MAP_PRIVATE | MAP_ANONYMOUS, 0);
 #else
     memset(str, 0, 32);
     sprintf(str, "%d", i);
@@ -47,7 +47,7 @@ void create_join_threads(pthread_t *ptid, void **buffers, struct output *op) {
     	perror("Error writing last byte of the file");
     	exit(EXIT_FAILURE);
     }
-    buffers[i] = create_bufs(fd[i]);
+    buffers[i] = create_bufs(MAP_SHARED, fd[i]);
 #endif
     }
     start_time = get_time_us();

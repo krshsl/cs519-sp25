@@ -6,7 +6,7 @@ size_t buf_size = DEFAULT_BUF_SIZE;
 void perform_iter(int *extns_cnt, int *pages_cnt, struct output *op) {
     long start_time, end_time;
 #ifndef IS_FILE
-    void *buffer = create_bufs(0);
+    void *buffer = create_bufs(MAP_PRIVATE | MAP_ANONYMOUS, 0);
 #else
     const char *filepath = "/tmp/mmapped.bin";
     int fd, result;
@@ -29,7 +29,7 @@ void perform_iter(int *extns_cnt, int *pages_cnt, struct output *op) {
     	perror("Error writing last byte of the file");
     	exit(EXIT_FAILURE);
     }
-    void *buffer = create_bufs(fd);
+    void *buffer = create_bufs(MAP_SHARED, fd);
 #endif
     start_time = get_time_us();
     init_extents();

@@ -38,10 +38,10 @@ static long get_time_us(void) {
 
 extern size_t buf_size;
 
-void *create_bufs(int fd) {
+void *create_bufs(int flags, int fd) {
     // https://stackoverflow.com/a/26259596
     char *buffer = (char *)mmap(0, buf_size, PROT_READ | PROT_WRITE,
-                      MAP_PRIVATE | MAP_ANONYMOUS, fd, 0);
+                      flags, fd, 0);
     if (buffer == MAP_FAILED) {
         perror("mmap");
         exit(EXIT_FAILURE);
