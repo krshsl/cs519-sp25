@@ -48,3 +48,5 @@ mkdir $fmap
 cd $fmap
 run_sim
 cd ..
+
+python3 gen_graph.py

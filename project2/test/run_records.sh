@@ -60,3 +60,5 @@ cd $fmap
 run_sim
 cd ..
 sudo perf probe -d $pmode
+
+python3 gen_plot.py
