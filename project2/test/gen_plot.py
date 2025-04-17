@@ -1,14 +1,14 @@
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
 import numpy as np
+import os
 
 mfolders = ["mmapr", "fmapr"]
 
 def read_latency_data():
-    buf_sizes = [65536, 1048576, 16777216, 268435456]
+    buf_sizes = [65536, 262144, 1048576, 4194304, 16777216, 67108864, 268435456]
     threads = [1, 2, 4, 8, 16, 32, 64]
 
     all_est_latency_data = []
@@ -89,10 +89,54 @@ def plot_3d_latency_per_type(df, label):
         plt.savefig(filename)
         plt.close()
 
-def main():
+def plot_mean_norm_surface(est_df, st_df):
+    est_df["source"] = "EST"
+    st_df["source"] = "ST"
+    combined = pd.concat([est_df, st_df], ignore_index=True)
+
+    combined = combined.dropna(subset=["time_diff"])
+    combined["time_diff_norm"] = combined.groupby(["buf_size", "thread_count", "source"])['time_diff'].transform(lambda x: x / x.max())
+
+    stats = combined.groupby(["thread_count", "buf_size", "source"])['time_diff_norm'].mean().reset_index()
+    buf_set = sorted(stats["buf_size"].unique())
+    buf_map = {b: i * 4 for i, b in enumerate(buf_set)}
+    stats["bufs_stretched"] = stats["buf_size"].map(buf_map)
+
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    markers = {"EST": 'o', "ST": '^'}
+    colors = {"EST": 'blue', "ST": 'orange'}
+
+    for source in stats["source"].unique():
+        sub = stats[stats["source"] == source]
+        ax.plot_trisurf(
+            sub['bufs_stretched'],
+            sub['thread_count'],
+            sub['time_diff_norm'],
+            color=colors[source],
+            edgecolor='none',
+            alpha=0.8,
+            label=source
+        )
+
+    ax.set_title("Mean Normalized Time Diff: Thread Count vs Buffer Size")
+    ax.set_xlabel("Buffer Size")
+    ax.set_xticks(list(buf_map.values()))
+    ax.set_xticklabels(list(buf_map.keys()))
+    ax.set_ylabel("Thread Count")
+    ax.set_yticks(range(0, 65, 8))
+    ax.set_zlabel("Mean Normalized Time Diff")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("out/mean_norm_time_diff_surface.png")
+    plt.close()
+
+if __name__ == "__main__":
+    if not os.path.exists('out') or not os.path.isdir('out'):
+        os.makedirs('out')
+
     est_df, st_df = read_latency_data()
     plot_3d_latency_per_type(est_df, "Extents")
     plot_3d_latency_per_type(st_df, "Normal")
-
-if __name__ == "__main__":
-    main()
+    plot_mean_norm_surface(est_df, st_df)

@@ -85,7 +85,7 @@ def plot_3d_graphs(est_df, st_df):
             ax.set_zlabel("Avg Time (μs)")
             ax.set_title(f"{mf.upper()} - {group_name.capitalize()} Buffers")
             ax.legend(handles, labels, loc='best')
-            plt.savefig(f"{mf}_{group_name}_avgtime_surface.png")
+            plt.savefig(f"out/{mf}_{group_name}_avgtime_surface.png")
             plt.close()
 
 
@@ -121,7 +121,7 @@ def plot_extents_graph(est_df):
         ax.set_xticklabels(list(thread_map.keys()))
         ax.set_zlabel("Avg Extents")
         ax.set_title(f"{mf.upper()} - Selected Buffers - Extents")
-        plt.savefig(f"{mf}_selected_extents_surface.png")
+        plt.savefig(f"out/{mf}_selected_extents_surface.png")
         plt.close()
 
 
@@ -149,10 +149,13 @@ def plot_cdf(est_df):
         plt.title("CDF for mmap - Buffer Size " + str(buf))
         plt.legend()
         plt.grid(True)
-        plt.savefig("cdf_mmap_buf_" + str(buf) + ".png")
+        plt.savefig("out/cdf_mmap_buf_" + str(buf) + ".png")
         plt.close()
 
 if __name__ == "__main__":
+    if not os.path.exists('out') or not os.path.isdir('out'):
+        os.makedirs('out')
+
     est_df, st_df = read_data()
     plot_3d_graphs(est_df, st_df)
     plot_extents_graph(est_df)

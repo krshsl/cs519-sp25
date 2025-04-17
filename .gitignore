@@ -11,3 +11,4 @@ linux-headers-5.15.0*
 
 project2/test/*fmap*
 project2/test/*mmap*
+project2/test/out
