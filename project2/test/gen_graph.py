@@ -7,7 +7,7 @@ from matplotlib.lines import Line2D
 mfolders = ["mmap", "fmap"]
 
 def read_data():
-    buf_sizes = [4096, 65536, 1048576, 16777216, 268435456]
+    buf_sizes = [65536, 262144, 1048576, 4194304, 16777216, 67108864, 268435456]
     threads = [1, 2, 4, 8, 16, 32, 64]
 
     all_est_data = []
@@ -45,8 +45,8 @@ def read_data():
 
 def plot_3d_graphs(est_df, st_df):
     buf_groups = {
-        "small": [4096, 65536, 1048576],
-        "large": [16777216, 268435456]
+        "small": [65536, 262144, 1048576],
+        "large": [4194304, 16777216, 67108864, 268435456]
     }
 
     for mf in mfolders:
@@ -90,7 +90,7 @@ def plot_3d_graphs(est_df, st_df):
 
 
 def plot_extents_graph(est_df):
-    buf_set = [16777216, 268435456]
+    buf_set = [4194304, 16777216, 67108864, 268435456]
 
     for mf in mfolders:
         fig = plt.figure()
@@ -126,7 +126,7 @@ def plot_extents_graph(est_df):
 
 
 def plot_cdf(est_df):
-    buf_sizes = [16777216, 268435456]
+    buf_sizes = [4194304, 16777216, 67108864, 268435456]
     threads = sorted(est_df["thread"].unique())
 
     for buf in buf_sizes:

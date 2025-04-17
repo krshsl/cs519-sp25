@@ -75,6 +75,7 @@ def plot_3d_latency_per_type(df, label):
 
         ax.set_title(f"{label} Latency Surface: Thread vs ThreadCount vs TimeDiff ({mfolder})")
         ax.set_xlabel("Thread")
+        ax.invert_xaxis()
         ax.set_ylabel("Thread Count")
         ax.set_yticks(range(0, 65, 8))
         ax.set_zlabel("Mean Time Difference (%)")
@@ -90,47 +91,52 @@ def plot_3d_latency_per_type(df, label):
         plt.close()
 
 def plot_mean_norm_surface(est_df, st_df):
-    est_df["source"] = "EST"
-    st_df["source"] = "ST"
-    combined = pd.concat([est_df, st_df], ignore_index=True)
+    est_df["source"] = "Extents"
+    st_df["source"] = "Normal"
+    for mfolder in mfolders:
+        combined = pd.concat([est_df, st_df], ignore_index=True)
+        combined = combined[combined["mfolder"] == mfolder]
 
-    combined = combined.dropna(subset=["time_diff"])
-    combined["time_diff_norm"] = combined.groupby(["buf_size", "thread_count", "source"])['time_diff'].transform(lambda x: x / x.max())
+        combined = combined.dropna(subset=["time_diff"])
+        combined["time_diff_norm"] = combined.groupby(["buf_size", "thread_count", "source"])['time_diff'].transform(lambda x: x / x.max())
 
-    stats = combined.groupby(["thread_count", "buf_size", "source"])['time_diff_norm'].mean().reset_index()
-    buf_set = sorted(stats["buf_size"].unique())
-    buf_map = {b: i * 4 for i, b in enumerate(buf_set)}
-    stats["bufs_stretched"] = stats["buf_size"].map(buf_map)
+        stats = combined.groupby(["thread_count", "buf_size", "source"])['time_diff_norm'].mean().reset_index()
+        buf_set = sorted(stats["buf_size"].unique())
+        buf_map = {b: i * 4 for i, b in enumerate(buf_set)}
+        stats["bufs_stretched"] = stats["buf_size"].map(buf_map)
 
-    fig = plt.figure(figsize=(12, 8))
-    ax = fig.add_subplot(111, projection='3d')
+        fig = plt.figure(figsize=(14, 10))
+        ax = fig.add_subplot(111, projection='3d')
 
-    markers = {"EST": 'o', "ST": '^'}
-    colors = {"EST": 'blue', "ST": 'orange'}
+        markers = {"Extents": 'o', "Normal": '^'}
+        colors = {"Extents": 'green', "Normal": 'teal'}
 
-    for source in stats["source"].unique():
-        sub = stats[stats["source"] == source]
-        ax.plot_trisurf(
-            sub['bufs_stretched'],
-            sub['thread_count'],
-            sub['time_diff_norm'],
-            color=colors[source],
-            edgecolor='none',
-            alpha=0.8,
-            label=source
-        )
+        for source in stats["source"].unique():
+            sub = stats[stats["source"] == source]
+            ax.plot_trisurf(
+                sub['thread_count'],
+                sub['bufs_stretched'],
+                sub['time_diff_norm'],
+                # color=colors[source],
+                edgecolor='none',
+                alpha=0.5,
+                label=source
+            )
 
-    ax.set_title("Mean Normalized Time Diff: Thread Count vs Buffer Size")
-    ax.set_xlabel("Buffer Size")
-    ax.set_xticks(list(buf_map.values()))
-    ax.set_xticklabels(list(buf_map.keys()))
-    ax.set_ylabel("Thread Count")
-    ax.set_yticks(range(0, 65, 8))
-    ax.set_zlabel("Mean Normalized Time Diff")
-    ax.legend()
-    plt.tight_layout()
-    plt.savefig("out/mean_norm_time_diff_surface.png")
-    plt.close()
+        ax.set_title("Mean Normalized Time Diff: Thread Count vs Buffer Size")
+        ax.set_ylabel("Buffer Size")
+        ax.set_yticks(list(buf_map.values()))
+        ax.set_yticklabels(list(buf_map.keys()), rotation=30, verticalalignment='center')
+        ax.set_xlabel("Thread Count")
+        ax.set_xticks(range(0, 65, 8))
+        ax.invert_xaxis()
+        ax.invert_zaxis()
+        ax.set_zlabel("Mean Normalized Time Diff")
+        ax.legend()
+        plt.subplots_adjust(left=0.15, right=0.85, top=0.85, bottom=0.15)
+        plt.tight_layout()
+        plt.savefig(f"out/mean_norm_time_diff_surface_{mfolder}.png")
+        plt.close()
 
 if __name__ == "__main__":
     if not os.path.exists('out') or not os.path.isdir('out'):
@@ -139,4 +145,4 @@ if __name__ == "__main__":
     est_df, st_df = read_latency_data()
     plot_3d_latency_per_type(est_df, "Extents")
     plot_3d_latency_per_type(st_df, "Normal")
-    plot_mean_norm_surface(est_df, st_df)
+    # plot_mean_norm_surface(est_df, st_df)
