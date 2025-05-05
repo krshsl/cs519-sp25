@@ -1,0 +1,12 @@
+--- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-04 22:07:41.529878440 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-04 22:07:49.802017763 -0600
+@@ -10981,3 +10981,9 @@
+ {
+         trace_sched_update_nr_running_tp(rq, count);
+ }
++
++SYSCALL_DEFINE0(set_inactive) {
++    int tgid = current->tgid;
++    int pid = current->pid;
++    return 0;
++}

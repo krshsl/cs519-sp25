@@ -1,0 +1,10 @@
+--- ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl.orig	2025-05-04 21:59:32.421924877 -0600
++++ ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-05-04 22:00:01.446379105 -0600
+@@ -343,6 +343,7 @@
+ 332	common	statx			sys_statx
+ 333	common	io_pgetevents		sys_io_pgetevents
+ 334	common	rseq			sys_rseq
++335 common  set_inactive    sys_set_inactive
+ # don't use numbers 387 through 423, add new calls after the last
+ # 'common' entry
+ 424	common	pidfd_send_signal	sys_pidfd_send_signal
