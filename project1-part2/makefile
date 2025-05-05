@@ -8,7 +8,8 @@ all: pipe.o shmem.o
 pipe.o: IPC-pipe.c
 	$(CC) $^ -o $@ $(LIBRARY_OPTS) $(COMPILER_OPTS_1)
 
-shmem: IPC-shmem.c
+shmem.o: IPC-shmem.c
 	$(CC) $^ -o $@ $(LIBRARY_OPTS) $(COMPILER_OPTS_2)
+
 clean:
-	rm -f pipe shmem
+	rm -f pipe.o shmem.o
