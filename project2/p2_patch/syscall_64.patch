@@ -1,5 +1,5 @@
---- ../project2/linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl.orig	2025-04-09 22:21:52.415695977 -0600
-+++ ../project2/linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-04-12 18:56:32.304616741 -0600
+--- ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl.orig	2025-04-09 22:21:52.415695977 -0600
++++ ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-04-12 18:56:32.304616741 -0600
 @@ -343,6 +343,10 @@
  332	common	statx			sys_statx
  333	common	io_pgetevents		sys_io_pgetevents

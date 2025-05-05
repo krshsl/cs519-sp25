@@ -1,15 +1,9 @@
 #! /bin/bash
-patch_file=project2.patch
-if [ -f "$patch_file" ]; then
-    rm $patch_file
-    touch $patch_file
-fi
-
 outdir=p2_patch
 if [ -d "$outdir" ]; then
     rm -rf $outdir
-    mkdir $outdir
 fi
+mkdir $outdir
 
 . ./set_patch_env.sh
 for i in ${!patch_dirs[@]}
