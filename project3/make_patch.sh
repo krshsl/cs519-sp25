@@ -13,3 +13,13 @@ do
     diff -u "${pF}.orig" "${pF}" > $oF
     echo "Added patch file: ${oF}"
 done
+
+patch_dirs=(sched/my_inactive.h)
+out_dirs=(my_inactive_h.patch)
+for i in ${!patch_dirs[@]}
+do
+    pF="${p21}/${patch_dirs[i]}"
+    oF="${outdir}/${out_dirs[i]}"
+    diff -Nu /dev/null ${pF} > $oF
+    echo "Added patch file: ${oF}"
+done
