@@ -1,0 +1,47 @@
+--- /dev/null	2025-05-08 09:18:01.775227304 -0600
++++ ./linux-5.15.0/kernel/sched/my_inactive.h	2025-05-08 08:01:40.211572093 -0600
+@@ -0,0 +1,44 @@
++#ifndef _LINUX_MY_SLEEP_H
++#define _LINUX_MY_SLEEP_H
++
++#include <linux/rbtree.h>
++#include <linux/list.h>
++
++#define LOG_MY_FUNCS
++
++#ifdef LOG_MY_FUNCS
++    #define IS_EMPTY_ARGS(dummy, ...) ( sizeof( (char[]){#__VA_ARGS__} ) == 1 )
++
++    #define LOG_FUNCS(level, ...) do { \
++        printk(level "%s:%d", __func__, __LINE__); \
++        if (!IS_EMPTY_ARGS(__VA_ARGS__)) pr_cont("::"); \
++        pr_cont(__VA_ARGS__); \
++        pr_cont("\n"); \
++    } while(0)
++
++    #define LPRINTK(fmt, ...) printk(fmt, ##__VA_ARGS__)
++#else
++    #define LOG_FUNCS(level, ...)
++    #define LPRINTK(...)
++#endif
++
++struct inactive_tasks {
++    pid_t pid;
++    u64 run_time;
++    u64 inactive_time;
++    struct list_head head;
++};
++
++struct inactive_cpu {
++    unsigned int cpu;
++    raw_spinlock_t lock;
++    int counter;
++    struct list_head proc_list;
++    struct rb_node root;
++};
++
++int find_inactive_cpu(const void *key, const struct rb_node *node);
++bool add_inactive_cpu(struct rb_node *node, const struct rb_node *parent);
++struct inactive_cpu *get_inactive_cpu(unsigned int cpu);
++
++#endif //_LINUX_MY_SLEEP_H
