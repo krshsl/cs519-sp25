@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-07 16:58:08.946133446 -0600
-+++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 08:33:07.344598023 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 11:07:50.199810779 -0600
 @@ -6,6 +6,10 @@
   *
   *  Copyright (C) 1991-2002  Linus Torvalds
@@ -108,7 +108,7 @@
  
  	/*
  	 * A queue event has occurred, and we're going to schedule.  In
-@@ -10981,3 +11058,126 @@
+@@ -10981,3 +11058,129 @@
  {
          trace_sched_update_nr_running_tp(rq, count);
  }
@@ -149,12 +149,15 @@
 +    for (i = 0; i < max_cpu; i++) {
 +        node = get_inactive_cpu(i);
 +        if (node == NULL) {
++            LOG_FUNCS(KERN_INFO, "Add... %u", i);
 +            node = kmalloc(sizeof(struct inactive_cpu), GFP_KERNEL);
 +            node->cpu = i;
 +            node->lock = __RAW_SPIN_LOCK_UNLOCKED(node->lock);
 +            node->counter = 0;
 +            INIT_LIST_HEAD(&node->proc_list);
 +            rb_add(&node->root, &inactive_cpu_tree, add_inactive_cpu);
++        } else {
++            LOG_FUNCS(KERN_INFO, "Find... %u", i);
 +        }
 +    }
 +    LOG_FUNCS(KERN_INFO, "Ends... %d", current->pid);
@@ -225,8 +228,8 @@
 +        if (cpu->counter) {
 +            raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
 +            list_for_each_entry_safe(task, t_tmp, &cpu->proc_list, head) {
-+                cpu->counter--;
 +                list_del(&task->head);
++                cpu->counter--;
 +                kfree(task);
 +            }
 +            raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);

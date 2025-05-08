@@ -25,6 +25,7 @@
 
 
 int main(int argc, char *argv[]) {
+    printf("sys_set_inactive_cpus\n");
     syscall(sys_set_inactive_cpus); // not possible to get -ve vals???
 
     // int num_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
@@ -92,6 +93,7 @@ int main(int argc, char *argv[]) {
     }
 
     free(child_pids);
+    printf("sys_del_inactive_pids\n");
     syscall(sys_del_inactive_pids); // not possible to get -ve vals???
     exit(EXIT_SUCCESS);
 }
