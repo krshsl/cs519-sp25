@@ -4,7 +4,7 @@ COMPILER_OPTS = -march=native -floop-parallelize-all -Ofast -Wall -Werror
 
 CC=gcc
 
-all: test.o
+all: test.o shmem.o
 
 test.o: test.c
 	$(CC) $^ $(COMPILER_COMMANDS) -o $@
@@ -13,4 +13,4 @@ shmem.o: IPC-shmem.c
 	$(CC) $^ -o $@ $(LIBRARY_OPS) $(COMPILER_OPTS)
 
 clean:
-	rm test.o
+	rm test.o shmem.o

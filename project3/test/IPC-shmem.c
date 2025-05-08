@@ -25,9 +25,22 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
+#include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+
+#ifndef sys_set_inactive_cpus
+#define sys_set_inactive_cpus 335
+#endif
+
+#ifndef sys_set_inactive_pid
+#define sys_set_inactive_pid 336
+#endif
+
+#ifndef sys_del_inactive_pids
+#define sys_del_inactive_pids 337
+#endif
 
 //Add all your global variables and definitions here.
 #define MATRIX_SIZE 10000
@@ -36,6 +49,7 @@
 				 (MATRIX_SIZE < 4096 ? 1024 : \
 				 (MATRIX_SIZE <= 8192 ? 512 : 4)))
 #define MAX_CORES 16
+#define MAX_ALLOWED_CORES 16
 #define IS_VALIDATE_MATRIX 0
 #define VALIDATE_MAX_SIZE 10000
 #define PRINT_CAP 4
@@ -50,6 +64,7 @@ struct active_time_shd {
 };
 
 int maxCores = MINF(MATRIX_SIZE, MAX_CORES); // hard limit to not size of matrix
+int maxAllowedCores = -1;
 int print_mode = 1; // print in csv format for easy parsing
 int active_time_id = -1;
 struct active_time_shd *active_time = NULL;
@@ -69,8 +84,9 @@ void free_shm_matrix(float **matrix, int shmid, int *shmids);
 void print_matrix(float **matrix, int size, const char *msg);
 void print_result(float **matrix, int size, const char *msg);
 void free_matrix(float **matrix, int size);
-void init_workers(float **matrix1, float **matrix2, float **result);
+pid_t *init_workers(float **matrix1, float **matrix2, float **result);
 void child_worker(float **matrix1, float **matrix2, float **result, int id);
+void wait_workers(pid_t *children);
 void validate_mult(float **matrix1, float **matrix2, float **result);
 
 void validate_args(int argc, char const **argv) {
@@ -96,6 +112,8 @@ void validate_args(int argc, char const **argv) {
 			}
 		}
 	}
+
+	maxAllowedCores = MINF(sysconf(_SC_NPROCESSORS_ONLN), MAX_ALLOWED_CORES);
 }
 
 /* Time function that calculates time between start and end */
@@ -276,27 +294,42 @@ void child_worker(float **matrix1, float **matrix2, float **result, int id) {
 	exit(0);
 }
 
-void init_workers(float **matrix1, float **matrix2, float **result) {
-	pid_t pid;
-	for (int i = 0; i < maxCores; i++) {
+pid_t *init_workers(float **matrix1, float **matrix2, float **result) {
+	pid_t *children = calloc(maxCores, sizeof(pid_t));
+    pid_t pid;
+    cpu_set_t set;
+    CPU_ZERO(&set);
+	for (int i = 0, j = 0; i < maxCores; i++, j = (j+1)%maxAllowedCores) {
 		pid = fork();
 
 		if (pid < 0) {
             perror("fork failed");
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
+            CPU_SET(j, &set);
+            if (sched_setaffinity(getpid(), sizeof(set), &set) == -1)
+                err(EXIT_FAILURE, "sched_setaffinity");
+
 			child_worker(matrix1, matrix2, result, i);
 		}
+		children[i] = pid;
 	}
+	return children;
 }
 
-void wait_workers() {
+void wait_workers(pid_t *children) {
     while(active_time->counter < 2*maxCores) {
         sched_yield();
     }
 
     for (int i = 0; i < maxCores; i++) {
-        // do more opr...
+        if (children[i]) {
+            if (syscall(sys_del_inactive_pids, children[i], active_time->proc_time) < 0) {
+                perror("syscall set_inactive (test)");
+                syscall(sys_del_inactive_pids); // just to be safe....
+                exit(EXIT_FAILURE);
+            }
+        }
     }
 
 	for (int i = 0; i < maxCores; i++) {
@@ -447,7 +480,9 @@ void free_active_time(void) {
 int main(int argc, char const *argv[]) {
 	srand(time(NULL));
 	validate_args(argc, argv);
-	int res_id, shm_ids[MATRIX_SIZE];
+    syscall(sys_set_inactive_cpus); // not possible to get -ve vals???
+	pid_t *children = NULL;
+    int res_id, shm_ids[MATRIX_SIZE];
 	double time_taken = 0;
 	struct timeval begin, end;
 	float **matrix1 = init_matrix(MATRIX_SIZE, 1);
@@ -459,8 +494,8 @@ int main(int argc, char const *argv[]) {
 
 	// time taken to perform matrix multiplication related tasks
 	gettimeofday(&begin, NULL);
-	init_workers(matrix1, matrix2, result);
-	wait_workers();
+	children = init_workers(matrix1, matrix2, result);
+	wait_workers(children);
 	print_result(result, MATRIX_SIZE, "Result");
 	gettimeofday(&end, NULL);
 	time_taken = getdetlatimeofday(&begin, &end);
@@ -470,9 +505,11 @@ int main(int argc, char const *argv[]) {
 	gettimeofday(&begin, NULL);
 	validate_mult(matrix1, matrix2, result);
 	gettimeofday(&end, NULL);
+	free(children);
 	free_matrix(matrix1, MATRIX_SIZE);
 	free_matrix(matrix2, MATRIX_SIZE);
     free_shm_matrix(result, res_id, shm_ids);
     free_active_time();
+    syscall(sys_del_inactive_pids); // not possible to get -ve vals???
 	return 0;
 }
