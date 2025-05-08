@@ -1,6 +1,6 @@
 // lscpu | egrep -i 'core.*:|socket'
 // time -p ./test.o 0 15 100000000
-// make; ./test.o 2 100;  sudo dmesg | grep do_sys_set_inactive_cpus
+// make; ./test.o 2 100 &;  sudo dmesg -we
 #define _GNU_SOURCE
 #include <err.h>
 #include <sched.h>
@@ -10,10 +10,6 @@
 #include <sys/wait.h>
 #include <sys/syscall.h>
 #include <unistd.h>
-
-#ifndef sys_set_inactive_cpus
-#define sys_set_inactive_cpus 335
-#endif
 
 #ifndef sys_set_inactive_pid
 #define sys_set_inactive_pid 336
@@ -25,9 +21,6 @@
 
 
 int main(int argc, char *argv[]) {
-    printf("sys_set_inactive_cpus\n");
-    syscall(sys_set_inactive_cpus); // not possible to get -ve vals???
-
     // int num_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
     int num_processors = 2;
     int  children;

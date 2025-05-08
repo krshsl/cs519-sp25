@@ -30,10 +30,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#ifndef sys_set_inactive_cpus
-#define sys_set_inactive_cpus 335
-#endif
-
 #ifndef sys_set_inactive_pid
 #define sys_set_inactive_pid 336
 #endif
@@ -67,6 +63,8 @@ int maxCores = MINF(MATRIX_SIZE, MAX_CORES); // hard limit to not size of matrix
 int maxAllowedCores = -1;
 int print_mode = 1; // print in csv format for easy parsing
 int active_time_id = -1;
+int res_id;
+int shm_ids[MATRIX_SIZE];
 struct active_time_shd *active_time = NULL;
 pthread_mutexattr_t attr;
 
@@ -78,9 +76,9 @@ void init_active_time(void);
 float random_num(float min, float max);
 float **init_matrix(int size, unsigned char is_zero);
 float *create_shm_rows(int *shmid);
-float **create_shm_matrix(int *shmid, int *shmids);
+float **create_shm_matrix(void);
 void free_active_time(void);
-void free_shm_matrix(float **matrix, int shmid, int *shmids);
+void free_shm_matrix(float **matrix);
 void print_matrix(float **matrix, int size, const char *msg);
 void print_result(float **matrix, int size, const char *msg);
 void free_matrix(float **matrix, int size);
@@ -423,50 +421,59 @@ float *create_shm_rows(int *shmid) {
 
 	if (*shmid == -1) {
 		perror("shmget data");
-		exit(EXIT_FAILURE);
+		return NULL;
 	}
 	float *result = (float*)shmat(*shmid, NULL, 0);
 
 	if (result == (void *)-1) {
 		perror("shmat data");
-		exit(EXIT_FAILURE);
+	    shmctl(*shmid, IPC_RMID, NULL);
+		return NULL;
 	}
 	memset(result, 0, size);
 	return result;
 }
 
-float **create_shm_matrix(int *shmid, int *shmids) {
-    size_t size = sizeof(float*) * MATRIX_SIZE;
-    *shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0600);
+float **create_shm_matrix() {
+    memset(shm_ids, -1, sizeof(float) * MATRIX_SIZE);
 
-	if (*shmid == -1) {
+    size_t size = sizeof(float*) * MATRIX_SIZE;
+    res_id = shmget(IPC_PRIVATE, size, IPC_CREAT | 0600);
+
+	if (res_id == -1) {
         perror("shmget data");
         exit(EXIT_FAILURE);
     }
-    float **result = (float**)shmat(*shmid, NULL, 0);
-	for (int i = 0; i < MATRIX_SIZE; i++) {
-		shmids[i] = -1;
-		result[i] = create_shm_rows(&shmids[i]);
-	}
+	float **result = (float**)shmat(res_id, NULL, 0);
 
-    if (result == (void *)-1) {
+	if (result == (void *)-1) {
         perror("shmat data");
+	    shmctl(res_id, IPC_RMID, NULL);
         exit(EXIT_FAILURE);
     }
+
+	for (int i = 0; i < MATRIX_SIZE; i++) {
+		shm_ids[i] = -1;
+		result[i] = create_shm_rows(&shm_ids[i]);
+		if (result[i] == NULL || shm_ids[i] == -1) {
+		    free_shm_matrix(result);
+			exit(EXIT_FAILURE);
+		}
+	}
     return result;
 }
 
-void free_shm_matrix(float **matrix, int shmid, int *shmids) {
+void free_shm_matrix(float **matrix) {
 	for (int i = 0; i < MATRIX_SIZE; i++) {
-		if (shmids[i] != -1) {
+		if (shm_ids[i] != -1) {
 			shmdt(matrix[i]);
-			shmctl(shmids[i], IPC_RMID, NULL);
+			shmctl(shm_ids[i], IPC_RMID, NULL);
 		}
 	}
 
-	if (shmid != -1) {
+	if (res_id != -1) {
 		shmdt(matrix);
-		shmctl(shmid, IPC_RMID, NULL);
+		shmctl(res_id, IPC_RMID, NULL);
 	}
 }
 
@@ -480,16 +487,14 @@ void free_active_time(void) {
 int main(int argc, char const *argv[]) {
 	srand(time(NULL));
 	validate_args(argc, argv);
-    syscall(sys_set_inactive_cpus); // not possible to get -ve vals???
-	pid_t *children = NULL;
-    int res_id, shm_ids[MATRIX_SIZE];
+    pid_t *children = NULL;
 	double time_taken = 0;
 	struct timeval begin, end;
 	float **matrix1 = init_matrix(MATRIX_SIZE, 1);
 	print_matrix(matrix1, MATRIX_SIZE, "Matrix 1");
 	float **matrix2 = init_matrix(MATRIX_SIZE, 1);
 	print_matrix(matrix2, MATRIX_SIZE, "Matrix 2");
-	float **result = create_shm_matrix(&res_id, shm_ids);
+	float **result = create_shm_matrix();
 	init_active_time();
 
 	// time taken to perform matrix multiplication related tasks
@@ -508,7 +513,7 @@ int main(int argc, char const *argv[]) {
 	free(children);
 	free_matrix(matrix1, MATRIX_SIZE);
 	free_matrix(matrix2, MATRIX_SIZE);
-    free_shm_matrix(result, res_id, shm_ids);
+    free_shm_matrix(result);
     free_active_time();
     syscall(sys_del_inactive_pids); // not possible to get -ve vals???
 	return 0;
