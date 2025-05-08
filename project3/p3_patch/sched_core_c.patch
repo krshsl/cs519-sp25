@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-07 16:58:08.946133446 -0600
-+++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 15:25:48.136209938 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 16:58:14.770069211 -0600
 @@ -6,6 +6,10 @@
   *
   *  Copyright (C) 1991-2002  Linus Torvalds
@@ -21,7 +21,7 @@
  /*
   * Export tracepoints that act as a bare tracehook (ie: have no trace event
   * associated with them) to allow external modules to probe them.
-@@ -2088,12 +2094,79 @@
+@@ -2088,12 +2094,82 @@
  		p->sched_class->prio_changed(rq, p, oldprio);
  }
  
@@ -30,12 +30,14 @@
 + * 0: going to put it to sleep...
 +*/
 +int check_inactive(struct rq* rq, struct task_struct *p) {
-+    struct inactive_cpu *cpu = this_cpu_ptr(&ia_cpu_queue);
++    int task_core = task_cpu(p);
++    struct inactive_cpu *cpu = &per_cpu(ia_cpu_queue, task_core); // techincally it should be the same cpu, but why bother
 +    struct list_head *cursor = NULL, *tmp = NULL;
 +    struct inactive_tasks *node = NULL, *found = NULL;
 +    unsigned long cpu_flags;
 +    u64 now;
 +
++    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", task_core, p->pid);
 +    if (cpu->counter == 0) { // some input present...
 +        return 1;
 +    }
@@ -48,12 +50,12 @@
 +	}
 +	node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head);
 +
-+	if (found != NULL) {
-+        LOG_FUNCS(KERN_INFO, "Begins... %u::%d", current->cpu, current->pid);
++	if (found != NULL) { // technically not supposed to happen, but whatever???
 +		if (node != found) {
 +		    LOG_FUNCS(KERN_INFO, "Node and key are different... node:found::%d:%d", node->pid, found->pid);
-+			raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +			schedule_timeout_interruptible(found->inactive_time);
++			raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++			LOG_FUNCS(KERN_INFO, "Ends... %d::%d", task_core, p->pid);
 +		    return 0;
 +		} else {
 +		    now = rq_clock_task(rq);
@@ -67,7 +69,7 @@
 +                        // node doesn't exist, del and cont...
 +                        list_del(&node->head);
 +                        cpu->counter--;
-+                        LOG_FUNCS(KERN_INFO, "Key removed... %d:%u", node->pid, current->cpu);
++                        LOG_FUNCS(KERN_INFO, "Key removed... %d:%d", node->pid, task_core);
 +                        kfree(node);
 +                        continue;
 +                    }
@@ -77,15 +79,16 @@
 +
 +				// if we found a new head, yay, or nvm, return 1, no interrupts ever, lessgo
 +				if (node != found) {
-+				    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +				    schedule_timeout_interruptible(found->inactive_time);
++				    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++					LOG_FUNCS(KERN_INFO, "Ends... %d::%d", task_core, p->pid);
 +					return 0;
 +				}
 +			}
 +		}
-+		LOG_FUNCS(KERN_INFO, "Ends... %d", current->pid);
 +	}
 +	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++	LOG_FUNCS(KERN_INFO, "Ends... %d::%d", task_core, p->pid);
 +	return 1;
 +}
 +
@@ -105,7 +108,7 @@
  
  	/*
  	 * A queue event has occurred, and we're going to schedule.  In
-@@ -9546,6 +9619,13 @@
+@@ -9546,6 +9622,13 @@
  #endif
  	}
  
@@ -119,7 +122,7 @@
  	set_load_weight(&init_task, false);
  
  	/*
-@@ -10981,3 +11061,80 @@
+@@ -10981,3 +11064,82 @@
  {
          trace_sched_update_nr_running_tp(rq, count);
  }
@@ -133,8 +136,9 @@
 +    struct list_head *tmp = NULL;
 +    unsigned long cpu_flags;
 +    struct pid* pid;
++    int task_core;
 +
-+    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", current->pid, upid);
++    LOG_FUNCS(KERN_INFO, "Begins... %d::%d::%d", current->pid, upid, smp_processor_id());
 +    pid = find_vpid(upid);
 +    p = pid_task(pid, PIDTYPE_PID);
 +    if (p == NULL) {
@@ -142,9 +146,10 @@
 +        return 0; // process has already exited, no need to add...
 +    }
 +
++    task_core = task_cpu(p);
 +    inactive_time = max_t(u64, inactive_time, 20000LL); // inactive_time should atleast be 2 times the sched val...
-+    LOG_FUNCS(KERN_INFO, "%d:%d:%u:%llu", current->pid, upid, p->cpu, inactive_time);
-+    cpu = &per_cpu(ia_cpu_queue, p->cpu);
++    LOG_FUNCS(KERN_INFO, "%d:%d:%d:%llu", current->pid, upid, task_core, inactive_time);
++    cpu = &per_cpu(ia_cpu_queue, task_core);
 +    if (cpu == NULL) { // can never be null cause it is always supposed to exist??
 +        return -EFAULT;
 +    }
@@ -157,14 +162,14 @@
 +    }
 +
 +    if (task) {
-+        LOG_FUNCS(KERN_INFO, "Existing key updated... %d::%u", upid, p->cpu);
++        LOG_FUNCS(KERN_INFO, "Existing key updated... %d::%d", upid, task_core);
 +        task->inactive_time = inactive_time;
-+        task->run_time = ktime_get_ns()+inactive_time;
++        task->run_time = ktime_get_ns()+inactive_time; // aprox time is fine by me
 +    } else {
-+        LOG_FUNCS(KERN_INFO, "New Key added... %d::%u", upid, p->cpu);
++        LOG_FUNCS(KERN_INFO, "New Key added... %d::%d", upid, task_core);
 +        task = kmalloc(sizeof(struct inactive_tasks), GFP_KERNEL);
 +        task->pid = upid;
-+        task->run_time = ktime_get_ns()+inactive_time;
++        task->run_time = ktime_get_ns()+inactive_time; // aprox time is fine by me
 +        task->inactive_time = inactive_time;
 +        INIT_LIST_HEAD(&task->head);
 +        list_add_tail(&task->head, &cpu->proc_list);
@@ -172,7 +177,7 @@
 +    }
 +    p->inactive_tracker = current->pid; // parent pid added to inactive tracker
 +    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
-+    LOG_FUNCS(KERN_INFO, "Ends... %d", current->pid);
++    LOG_FUNCS(KERN_INFO, "Ends... %d::%d::%d", current->pid, upid, smp_processor_id());
 +    return 0;
 +}
 +
@@ -185,7 +190,7 @@
 +    LOG_FUNCS(KERN_INFO, "Begins... %d", current->pid);
 +    for_each_possible_cpu(i) {
 +        cpu = &per_cpu(ia_cpu_queue, i);
-+        LOG_FUNCS(KERN_INFO, "%u::%d::%d", current->cpu, i, cpu->counter);
++        LOG_FUNCS(KERN_INFO, "%d::%d::%d", smp_processor_id(), i, cpu->counter);
 +        if (cpu->counter) {
 +            raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
 +            list_for_each_entry_safe(task, t_tmp, &cpu->proc_list, head) {
