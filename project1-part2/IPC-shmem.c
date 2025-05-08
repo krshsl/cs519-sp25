@@ -1,13 +1,14 @@
 /* CS 519, Spring 2025: Project 1 - Part 2
  * IPC using shared memory to perform matrix multiplication.
  * Feel free to extend or change any code or functions below.
- * 
+ *
  * use following command to get approx performance stats:
  * make && /usr/bin/time -f "%e,%U,%S" -q ./shmem -p
- * 
- * Please make sure to run the following commands to make the program faster!
- * sudo echo "#kernel shmmni increased for shmem implementation" >> /etc/sysctl.conf
- * sudo echo "kernel.shmmni=16384" >> /etc/sysctl.conf
+ *
+ * Please make sure to run the following commands to make the program work!
+ * echo "#kernel shmmni increased for shmem implementation" | sudo tee -a /etc/sysctl.conf
+ * echo "kernel.shmmni=16384" | sudo tee -a /etc/sysctl.conf
+ * tail -n 2 /etc/sysctl.conf
  */
 #define _GNU_SOURCE
 #include <err.h>
@@ -115,7 +116,7 @@ float **init_matrix(int size, unsigned char is_zero) {
    	float **matrix = (float **)malloc(size * sizeof(float *));
    	for (int i = 0; i < size; i++) {
 		matrix[i] = (float *)malloc(size * sizeof(float));
-		
+
 		if (is_zero == 0) {
 			memset(matrix[i], 0, size * sizeof(float));
 			continue;
@@ -334,7 +335,7 @@ void validate_mult(float **matrix1, float **matrix2, float **result) {
 float *create_shm_rows(int *shmid) {
 	size_t size = sizeof(float) * MATRIX_SIZE;
 	*shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0600);
-	
+
 	if (*shmid == -1) {
 		perror("shmget data");
 		exit(EXIT_FAILURE);
@@ -352,7 +353,7 @@ float *create_shm_rows(int *shmid) {
 float **create_shm_matrix(int *shmid, int *shmids) {
     size_t size = sizeof(float*) * MATRIX_SIZE;
     *shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0600);
-    
+
 	if (*shmid == -1) {
         perror("shmget data");
         exit(EXIT_FAILURE);
@@ -414,5 +415,3 @@ int main(int argc, char const *argv[]) {
     free_shm_matrix(result, res_id, shm_ids);
 	return 0;
 }
-
-
