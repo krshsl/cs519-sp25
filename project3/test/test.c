@@ -10,14 +10,25 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-#ifndef sys_set_inactive
-#define sys_set_inactive 335
+#ifndef sys_set_inactive_cpus
+#define sys_set_inactive_cpus 335
+#endif
+
+#ifndef sys_set_inactive_pid
+#define sys_set_inactive_pid 336
+#endif
+
+#ifndef sys_del_inactive_pids
+#define sys_del_inactive_pids 337
 #endif
 
 
 int main(int argc, char *argv[]) {
-    int num_processors = 2;//(int)sysconf(_SC_NPROCESSORS_ONLN);
-    int  children, uniq_procs;
+    syscall(sys_set_inactive_cpus); // not possible to get -ve vals???
+
+    // int num_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    int num_processors = 2;
+    int  children;
     pid_t *child_pids, w;
     cpu_set_t     set;
     unsigned int  nloops;
@@ -36,8 +47,7 @@ int main(int argc, char *argv[]) {
     children = atoi(argv[1]);
     children = ((children == 0) ? num_processors : (children > 10000 ? 10000 : children));
     nloops = atoi(argv[2]);
-    uniq_procs = (int)children/num_processors;
-    printf("%d,%d,%d\n", uniq_procs, children, num_processors);
+    printf("%d,%d\n", children, num_processors);
 
     child_pids = malloc(children*sizeof(pid_t));
     if (child_pids == NULL) {
@@ -63,48 +73,23 @@ int main(int argc, char *argv[]) {
         child_pids[i] = pid;
     }
 
-
-    int start = 0;
-    int iter = 0;
-    while(start < uniq_procs) {
-        printf("iter %d, start %d, uniq_procs %d\n", iter++, start, uniq_procs);
-        int j = 0;
-        for (int i = start*num_processors; i < children && i < (start+1)*num_processors; i++) {
-            if (child_pids[i]) {
-                printf("childid::%d\n", child_pids[i]);
-                w = waitpid(child_pids[i], &status, WNOHANG);
-                // w = waitpid(child_pids[i], &status, WUNTRACED | WCONTINUED);
-                if (w == -1) {
-                    perror("waitpid");
-                    exit(EXIT_FAILURE);
-                }
-                printf("exited, status %d\n", WEXITSTATUS(status));
-                printf("killed by signal %d\n", (WIFSIGNALED(status) && WTERMSIG(status)));
-                printf("stopped by signal %d\n", WSTOPSIG(status));
-
-                if (WEXITSTATUS(status) || (WIFSIGNALED(status) && WTERMSIG(status)) || WSTOPSIG(status)) {
-                    child_pids[i] = 0;
-                    j++;
-                }
-            } else {
-                j++;
-            }
-        }
-
-        for (int i = (start+1)*num_processors; i < children; i++) {
-            if (syscall(sys_set_inactive, child_pids[i], 10000LL) < 0) {
+    for (int i = 0; i < children; i++) {
+        if (child_pids[i]) {
+            if (syscall(sys_del_inactive_pids, child_pids[i], 60000LL) < 0) {
                 perror("syscall set_inactive (test)");
+                syscall(sys_del_inactive_pids); // just to be safe....
                 exit(EXIT_FAILURE);
             }
         }
+    }
 
-        if (j == num_processors) {
-            start++;
+    for (int i = 0; i < children; i++) {
+        if (child_pids[i]) {
+            wait(NULL); //wait for them to complete...
         }
-
-        usleep(10); // 10 micro = 10k nano
     }
 
     free(child_pids);
+    syscall(sys_del_inactive_pids); // not possible to get -ve vals???
     exit(EXIT_SUCCESS);
 }
