@@ -1,0 +1,10 @@
+--- ./linux-5.15.0/include/linux/sched.h.orig	2025-05-07 16:58:22.338308897 -0600
++++ ./linux-5.15.0/include/linux/sched.h	2025-05-08 15:27:16.697558613 -0600
+@@ -735,6 +735,7 @@
+ 	 */
+ 	randomized_struct_fields_start
+ 
++	pid_t               inactive_tracker;
+ 	void				*stack;
+ 	refcount_t			usage;
+ 	/* Per task flags (PF_*), defined further below: */

@@ -1,0 +1,10 @@
+--- ./linux-5.15.0/kernel/fork.c.orig	2025-05-08 15:24:50.827343179 -0600
++++ ./linux-5.15.0/kernel/fork.c	2025-05-08 15:24:57.391435751 -0600
+@@ -2284,6 +2284,7 @@
+ 	clear_tsk_latency_tracing(p);
+ 
+ 	/* ok, now we should be set up.. */
++	p->inactive_tracker = -1;
+ 	p->pid = pid_nr(pid);
+ 	if (clone_flags & CLONE_THREAD) {
+ 		p->group_leader = current->group_leader;

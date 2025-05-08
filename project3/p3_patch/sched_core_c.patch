@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-07 16:58:08.946133446 -0600
-+++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 12:09:27.042608367 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 15:25:48.136209938 -0600
 @@ -6,6 +6,10 @@
   *
   *  Copyright (C) 1991-2002  Linus Torvalds
@@ -11,18 +11,17 @@
  #define CREATE_TRACE_POINTS
  #include <trace/events/sched.h>
  #undef CREATE_TRACE_POINTS
-@@ -26,6 +30,10 @@
+@@ -26,7 +30,9 @@
  
  #include "pelt.h"
  #include "smp.h"
 +#include "my_inactive.h"
-+
-+int proc_inactive_time = 0;
-+struct rb_root inactive_cpu_tree = RB_ROOT; // would rather not remove them at all...
  
++DEFINE_PER_CPU(struct inactive_cpu, ia_cpu_queue);
  /*
   * Export tracepoints that act as a bare tracehook (ie: have no trace event
-@@ -2088,12 +2096,81 @@
+  * associated with them) to allow external modules to probe them.
+@@ -2088,12 +2094,79 @@
  		p->sched_class->prio_changed(rq, p, oldprio);
  }
  
@@ -31,17 +30,13 @@
 + * 0: going to put it to sleep...
 +*/
 +int check_inactive(struct rq* rq, struct task_struct *p) {
-+    struct inactive_cpu *cpu = NULL;
++    struct inactive_cpu *cpu = this_cpu_ptr(&ia_cpu_queue);
 +    struct list_head *cursor = NULL, *tmp = NULL;
 +    struct inactive_tasks *node = NULL, *found = NULL;
 +    unsigned long cpu_flags;
 +    u64 now;
-+    if (proc_inactive_time == 0) {
-+        return 1;
-+    }
 +
-+    cpu = get_inactive_cpu(p->cpu);
-+    if (cpu->counter == 0) {
++    if (cpu->counter == 0) { // some input present...
 +        return 1;
 +    }
 +	raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
@@ -52,43 +47,45 @@
 +		break;
 +	}
 +	node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head);
-+	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +
 +	if (found != NULL) {
-+        LOG_FUNCS(KERN_INFO, "Begins... %d", current->pid);
++        LOG_FUNCS(KERN_INFO, "Begins... %u::%d", current->cpu, current->pid);
 +		if (node != found) {
 +		    LOG_FUNCS(KERN_INFO, "Node and key are different... node:found::%d:%d", node->pid, found->pid);
++			raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +			schedule_timeout_interruptible(found->inactive_time);
 +		    return 0;
 +		} else {
 +		    now = rq_clock_task(rq);
 +			LOG_FUNCS(KERN_INFO, "Node time: %llu::%llu", now, found->run_time);
 +			if (now > found->run_time) {
-+                    raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
 +			    list_del(&found->head); // remove from top
 +				list_add_tail(&found->head, &cpu->proc_list); // add same in back
 +				while(1) {
-+				node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head); // new head
-+                        if (node != found && pid_task(find_vpid(node->pid), PIDTYPE_PID) == NULL) {
-+                            // node doesn't exist, del and cont...
-+                            list_del(&node->head);
-+                            cpu->counter--;
-+                            kfree(node);
-+                            continue;
-+                        }
-+				node->run_time = now + node->inactive_time;
-+                        break;
++				    node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head); // new head
++                    if (node != found && pid_task(find_vpid(node->pid), PIDTYPE_PID) == NULL) {
++                        // node doesn't exist, del and cont...
++                        list_del(&node->head);
++                        cpu->counter--;
++                        LOG_FUNCS(KERN_INFO, "Key removed... %d:%u", node->pid, current->cpu);
++                        kfree(node);
++                        continue;
++                    }
++                    node->run_time = now + node->inactive_time;
++                    break;
 +				}
-+				raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +
-+				if (node != found) { // what if after everything, it is still the only possible head??
++				// if we found a new head, yay, or nvm, return 1, no interrupts ever, lessgo
++				if (node != found) {
++				    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +				    schedule_timeout_interruptible(found->inactive_time);
++					return 0;
 +				}
-+				return 0;
 +			}
 +		}
 +		LOG_FUNCS(KERN_INFO, "Ends... %d", current->pid);
 +	}
++	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +	return 1;
 +}
 +
@@ -99,7 +96,7 @@
 -	else if (p->sched_class > rq->curr->sched_class)
 -		resched_curr(rq);
 +	if (p->sched_class == rq->curr->sched_class) {
-+	    if (check_inactive(rq, p)) {
++	    if (p->inactive_tracker == -1 || check_inactive(rq, p)) {
 +			rq->curr->sched_class->check_preempt_curr(rq, p, flags);
 +		}
 +	} else if (p->sched_class > rq->curr->sched_class) {
@@ -108,66 +105,26 @@
  
  	/*
  	 * A queue event has occurred, and we're going to schedule.  In
-@@ -10981,3 +11058,130 @@
+@@ -9546,6 +9619,13 @@
+ #endif
+ 	}
+ 
++	for_each_possible_cpu(i) {
++        struct inactive_cpu *ia_cpu = &per_cpu(ia_cpu_queue, i);
++        ia_cpu->lock = __RAW_SPIN_LOCK_UNLOCKED(node->lock);
++        ia_cpu->counter = 0;
++        INIT_LIST_HEAD(&ia_cpu->proc_list);
++	}
++
+ 	set_load_weight(&init_task, false);
+ 
+ 	/*
+@@ -10981,3 +11061,80 @@
  {
          trace_sched_update_nr_running_tp(rq, count);
  }
 +
-+int find_inactive_cpu(const void *key, const struct rb_node *node) {
-+    const unsigned int *cpu = (const unsigned int *)key;
-+    const struct inactive_cpu *proc = rb_entry(node, struct inactive_cpu, root);
-+    LOG_FUNCS(KERN_INFO, "%u::%u", *cpu, proc->cpu);
-+    if (*cpu > proc->cpu) {
-+        return -1;
-+    } else if (*cpu < proc->cpu) {
-+        return 1;
-+    } else {
-+        return 0;
-+    }
-+}
-+
-+bool add_inactive_cpu(struct rb_node *node, const struct rb_node *parent) {
-+    const struct inactive_cpu *n_proc = rb_entry(node, struct inactive_cpu, root);
-+    const struct inactive_cpu *p_proc = rb_entry(parent, struct inactive_cpu, root);
-+    return p_proc->cpu > n_proc->cpu;
-+}
-+
-+struct inactive_cpu *get_inactive_cpu(unsigned int cpu) {
-+    struct rb_node *cpu_node = NULL;
-+    cpu_node = rb_find(&cpu, &inactive_cpu_tree, find_inactive_cpu);
-+    if (cpu_node == NULL) {
-+        return NULL;
-+    }
-+    return rb_entry(cpu_node, struct inactive_cpu, root);
-+}
-+
-+SYSCALL_DEFINE0(set_inactive_cpus) {
-+    LOG_FUNCS(KERN_INFO, "Begins... %d", current->pid);
-+    unsigned int max_cpu = num_present_cpus();
-+    struct inactive_cpu *node = NULL;
-+    unsigned int i;
-+
-+    for (i = 0; i < max_cpu; i++) {
-+        node = get_inactive_cpu(i);
-+        if (node == NULL) {
-+            LOG_FUNCS(KERN_INFO, "Add... %u", i);
-+            node = kmalloc(sizeof(struct inactive_cpu), GFP_KERNEL);
-+            node->cpu = i;
-+            node->lock = __RAW_SPIN_LOCK_UNLOCKED(node->lock);
-+            node->counter = 0;
-+            INIT_LIST_HEAD(&node->proc_list);
-+            rb_add(&node->root, &inactive_cpu_tree, add_inactive_cpu);
-+        } else {
-+            LOG_FUNCS(KERN_INFO, "Find... %u", i);
-+        }
-+    }
-+    LOG_FUNCS(KERN_INFO, "Ends... %d", current->pid);
-+    return 0;
-+}
-+
 +SYSCALL_DEFINE2(set_inactive_pid, int, upid, unsigned long long, inactive_time) {
-+    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", current->pid, upid);
-+    // move_queued_task
 +    struct task_struct *p;
 +    struct inactive_cpu *cpu = NULL;
 +    struct inactive_tasks *task = NULL;
@@ -175,7 +132,10 @@
 +    struct list_head *pos = NULL;
 +    struct list_head *tmp = NULL;
 +    unsigned long cpu_flags;
-+    struct pid* pid = find_vpid(upid);
++    struct pid* pid;
++
++    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", current->pid, upid);
++    pid = find_vpid(upid);
 +    p = pid_task(pid, PIDTYPE_PID);
 +    if (p == NULL) {
 +        LOG_FUNCS(KERN_INFO, "Proc::%d exited. Ending...", upid);
@@ -184,7 +144,7 @@
 +
 +    inactive_time = max_t(u64, inactive_time, 20000LL); // inactive_time should atleast be 2 times the sched val...
 +    LOG_FUNCS(KERN_INFO, "%d:%d:%u:%llu", current->pid, upid, p->cpu, inactive_time);
-+    cpu = get_inactive_cpu(p->cpu);
++    cpu = &per_cpu(ia_cpu_queue, p->cpu);
 +    if (cpu == NULL) { // can never be null cause it is always supposed to exist??
 +        return -EFAULT;
 +    }
@@ -195,42 +155,43 @@
 +    	if (node->pid != upid) continue;
 +        task = node;
 +    }
-+    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +
 +    if (task) {
-+        LOG_FUNCS(KERN_INFO, "Existing key updated...");
++        LOG_FUNCS(KERN_INFO, "Existing key updated... %d::%u", upid, p->cpu);
 +        task->inactive_time = inactive_time;
 +        task->run_time = ktime_get_ns()+inactive_time;
 +    } else {
-+        LOG_FUNCS(KERN_INFO, "New Key added...");
++        LOG_FUNCS(KERN_INFO, "New Key added... %d::%u", upid, p->cpu);
 +        task = kmalloc(sizeof(struct inactive_tasks), GFP_KERNEL);
 +        task->pid = upid;
 +        task->run_time = ktime_get_ns()+inactive_time;
 +        task->inactive_time = inactive_time;
 +        INIT_LIST_HEAD(&task->head);
-+        raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
 +        list_add_tail(&task->head, &cpu->proc_list);
 +        cpu->counter++;
-+        raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +    }
-+    proc_inactive_time = 1;
++    p->inactive_tracker = current->pid; // parent pid added to inactive tracker
++    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +    LOG_FUNCS(KERN_INFO, "Ends... %d", current->pid);
 +    return 0;
 +}
 +
 +SYSCALL_DEFINE0(del_inactive_pids) {
-+    LOG_FUNCS(KERN_INFO, "Begins... %d", current->pid);
-+    struct inactive_cpu *cpu, *c_tmp;
++    struct inactive_cpu *cpu;
 +    struct inactive_tasks *task, *t_tmp;
 +    unsigned long cpu_flags;
-+    proc_inactive_time = 0;
-+    rbtree_postorder_for_each_entry_safe(cpu, c_tmp, &inactive_cpu_tree, root) {
-+        LOG_FUNCS(KERN_INFO, "%u::%d", cpu->cpu, cpu->counter);
++    int i;
++
++    LOG_FUNCS(KERN_INFO, "Begins... %d", current->pid);
++    for_each_possible_cpu(i) {
++        cpu = &per_cpu(ia_cpu_queue, i);
++        LOG_FUNCS(KERN_INFO, "%u::%d::%d", current->cpu, i, cpu->counter);
 +        if (cpu->counter) {
 +            raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
 +            list_for_each_entry_safe(task, t_tmp, &cpu->proc_list, head) {
 +                list_del(&task->head);
 +                cpu->counter--;
++                LOG_FUNCS(KERN_INFO, "Key removed... %d::%u", task->pid, i);
 +                kfree(task);
 +            }
 +            raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);

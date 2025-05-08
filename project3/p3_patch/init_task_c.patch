@@ -1,0 +1,10 @@
+--- ./linux-5.15.0/init/init_task.c.orig	2025-05-08 15:25:21.911800849 -0600
++++ ./linux-5.15.0/init/init_task.c	2025-05-08 15:25:27.407887005 -0600
+@@ -72,6 +72,7 @@
+ 	.stack_refcount	= REFCOUNT_INIT(1),
+ #endif
+ 	.__state	= 0,
++	.inactive_tracker = -1,
+ 	.stack		= init_stack,
+ 	.usage		= REFCOUNT_INIT(2),
+ 	.flags		= PF_KTHREAD,
