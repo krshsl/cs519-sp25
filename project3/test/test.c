@@ -1,5 +1,6 @@
 // lscpu | egrep -i 'core.*:|socket'
 // time -p ./test.o 0 15 100000000
+// make; ./test.o 2 100;  sudo dmesg | grep do_sys_set_inactive_cpus
 #define _GNU_SOURCE
 #include <err.h>
 #include <sched.h>
@@ -47,7 +48,7 @@ int main(int argc, char *argv[]) {
     children = atoi(argv[1]);
     children = ((children == 0) ? num_processors : (children > 10000 ? 10000 : children));
     nloops = atoi(argv[2]);
-    printf("%d,%d\n", children, num_processors);
+    printf("child::%d,  max_procs::%d\n", children, num_processors);
 
     child_pids = malloc(children*sizeof(pid_t));
     if (child_pids == NULL) {
@@ -75,10 +76,11 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < children; i++) {
         if (child_pids[i]) {
-            if (syscall(sys_del_inactive_pids, child_pids[i], 60000LL) < 0) {
-                perror("syscall set_inactive (test)");
-                syscall(sys_del_inactive_pids); // just to be safe....
-                exit(EXIT_FAILURE);
+            printf("do_sys_call... %d\n", child_pids[i]);
+            if (syscall(sys_set_inactive_pid, child_pids[i], 60000LL) < 0) {
+                printf("syscall failed since child_pid::%d exited...\n", child_pids[i]);
+                // syscall(sys_set_inactive_pid); // just to be safe....
+                // exit(EXIT_FAILURE);
             }
         }
     }
