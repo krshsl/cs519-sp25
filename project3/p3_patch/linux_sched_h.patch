@@ -1,0 +1,10 @@
+--- ./linux-5.15.0/include/linux/sched.h.orig	2025-05-07 16:58:22.338308897 -0600
++++ ./linux-5.15.0/include/linux/sched.h	2025-05-07 16:58:43.346583910 -0600
+@@ -535,6 +535,7 @@
+ 	u64				sum_exec_runtime;
+ 	u64				vruntime;
+ 	u64				prev_sum_exec_runtime;
++	u64             inactive_time;
+ 
+ 	u64				nr_migrations;
+ 

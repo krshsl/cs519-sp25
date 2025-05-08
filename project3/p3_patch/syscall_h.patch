@@ -1,11 +1,11 @@
---- ./linux-5.15.0/include/linux/syscalls.h.orig	2025-05-05 13:36:48.528059254 -0600
-+++ ./linux-5.15.0/include/linux/syscalls.h	2025-05-05 13:36:59.092182050 -0600
-@@ -96,6 +96,8 @@
+--- ./linux-5.15.0/include/linux/syscalls.h.orig	2025-05-07 16:56:14.736632886 -0600
++++ ./linux-5.15.0/include/linux/syscalls.h	2025-05-07 16:56:23.108743163 -0600
+@@ -1279,6 +1279,8 @@
   */
- #include <asm/syscall_wrapper.h>
+ asmlinkage long sys_ni_syscall(void);
  
-+/* sched/core.c */
-+asmlinkage long sys_set_inactive(void);
++/* core.c */
++asmlinkage long sys_set_inactive(int pid, unsigned long long time);
  #endif /* CONFIG_ARCH_HAS_SYSCALL_WRAPPER */
  
- /*
+ 

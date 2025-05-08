@@ -1,12 +1,68 @@
---- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-04 22:07:41.529878440 -0600
-+++ ./linux-5.15.0/kernel/sched/core.c	2025-05-04 22:07:49.802017763 -0600
-@@ -10981,3 +10981,9 @@
+--- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-07 16:58:08.946133446 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-07 17:32:26.853574554 -0600
+@@ -6,6 +6,7 @@
+  *
+  *  Copyright (C) 1991-2002  Linus Torvalds
+  */
++#include "linux/sched.h"
+ #define CREATE_TRACE_POINTS
+ #include <trace/events/sched.h>
+ #undef CREATE_TRACE_POINTS
+@@ -2090,11 +2091,21 @@
+ 
+ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
+ {
+-	if (p->sched_class == rq->curr->sched_class)
+-		rq->curr->sched_class->check_preempt_curr(rq, p, flags);
+-	else if (p->sched_class > rq->curr->sched_class)
+-		resched_curr(rq);
+-
++	if (p->sched_class == rq->curr->sched_class) {
++	    if (rq->curr->se.inactive_time) { // would be nice to automatically do this instead for every n timeframe??
++	        printk(KERN_INFO "%s:%d::%d:%d,%d,%u,%llu,%llu,%llu,%llu", \
++     			__func__, __LINE__, \
++                current->pid, p->pid, rq->curr->pid, rq->curr->cpu, \
++                p->se.inactive_time, rq->curr->se.inactive_time,
++                p->se.vruntime, rq->curr->se.vruntime);
++			schedule_timeout_uninterruptible(rq->curr->se.inactive_time);
++			rq->curr->se.inactive_time = 0LL;
++		} else {
++            rq->curr->sched_class->check_preempt_curr(rq, p, flags);
++		}
++	} else if (p->sched_class > rq->curr->sched_class) {
++	    resched_curr(rq);
++	}
+ 	/*
+ 	 * A queue event has occurred, and we're going to schedule.  In
+ 	 * this case, we can save a useless back to back clock update.
+@@ -4245,6 +4256,7 @@
+ 	p->se.prev_sum_exec_runtime	= 0;
+ 	p->se.nr_migrations		= 0;
+ 	p->se.vruntime			= 0;
++	p->se.inactive_time     = 0;
+ 	INIT_LIST_HEAD(&p->se.group_node);
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+@@ -10981,3 +10993,22 @@
  {
          trace_sched_update_nr_running_tp(rq, count);
  }
 +
-+SYSCALL_DEFINE0(set_inactive) {
-+    int tgid = current->tgid;
-+    int pid = current->pid;
++SYSCALL_DEFINE2(set_inactive, int, upid, unsigned long long, inactive_time) {
++    // move_queued_task
++    struct rq_flags rf;
++    struct task_struct *p;
++    struct rq* rq;
++    struct pid* pid = find_vpid(upid);
++    spin_lock(&pid->lock);
++    p = pid_task(pid, PIDTYPE_PID);
++    rq = task_rq_lock(p, &rf);
++    rq->curr->se.inactive_time = max_t(u64, inactive_time, 10000LL); // sleep for vruntime duration atleast
++    printk(KERN_INFO "%s:%d::%d:%d,%d,%u,%llu,%llu", \
++     			__func__, __LINE__, \
++                current->pid, p->pid, rq->curr->pid, rq->curr->cpu, \
++                p->se.inactive_time, rq->curr->se.inactive_time);
++    task_rq_unlock(rq, p, &rf);
++    spin_unlock(&pid->lock);
 +    return 0;
 +}
