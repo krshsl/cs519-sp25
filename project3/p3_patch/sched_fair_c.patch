@@ -1,4 +1,4 @@
---- ./linux-5.15.0/kernel/sched/fair.c.orig	2025-05-09 00:54:38.935067146 -0600
+--- ./linux-5.15.0/kernel/sched/fair.c.orig	2025-05-09 02:18:18.858052230 -0600
 +++ ./linux-5.15.0/kernel/sched/fair.c	2025-05-09 01:58:24.156767759 -0600
 @@ -21,6 +21,7 @@
   *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra

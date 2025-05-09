@@ -1,4 +1,4 @@
---- ./linux-5.15.0/include/linux/syscalls.h.orig	2025-05-09 00:32:24.791892511 -0600
+--- ./linux-5.15.0/include/linux/syscalls.h.orig	2025-05-09 02:18:18.846052097 -0600
 +++ ./linux-5.15.0/include/linux/syscalls.h	2025-05-09 00:32:24.935893917 -0600
 @@ -1279,6 +1279,8 @@
   */

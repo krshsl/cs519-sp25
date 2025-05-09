@@ -1,4 +1,4 @@
---- ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl.orig	2025-05-09 00:32:24.783892433 -0600
+--- ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl.orig	2025-05-09 02:18:18.842052052 -0600
 +++ ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-05-09 00:32:24.923893800 -0600
 @@ -343,6 +343,7 @@
  332	common	statx			sys_statx
