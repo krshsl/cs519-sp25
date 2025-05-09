@@ -1,6 +1,6 @@
 // lscpu | egrep -i 'core.*:|socket'
-// time -p ./test.o 0 15 100000000
-// make; ./test.o 2 100 &;  sudo dmesg -we
+// time -p ./test.o 2 16 1000000
+// make; ./test.o 2 2 100 &;  sudo dmesg -we
 #define _GNU_SOURCE
 #include <err.h>
 #include <sched.h>
@@ -17,27 +17,29 @@
 
 
 int main(int argc, char *argv[]) {
-    // int num_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    int num_processors = 2;
+    int max_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    int num_processors;
     int  children;
     pid_t *child_pids, w;
     cpu_set_t     set;
     unsigned int  nloops;
     int status;
 
-    if (num_processors < 0) {
+    if (max_processors < 0) {
         perror("sysconf");
         return 1;
     }
 
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s num-child num-loops\n",
-                argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s num-cores(1-%d) num-child num-loops\n",
+                argv[0], max_processors);
         exit(EXIT_FAILURE);
     }
-    children = atoi(argv[1]);
+    num_processors = atoi(argv[1]);
+    num_processors = ((num_processors == 0) ? 1 : (num_processors > max_processors ? max_processors : num_processors));
+    children = atoi(argv[2]);
     children = ((children == 0) ? num_processors : (children > 10000 ? 10000 : children));
-    nloops = atoi(argv[2]);
+    nloops = atoi(argv[3]);
     printf("child::%d,  max_procs::%d\n", children, num_processors);
 
     child_pids = malloc(children*sizeof(pid_t));
@@ -64,15 +66,17 @@ int main(int argc, char *argv[]) {
         child_pids[i] = pid;
     }
 
+#ifdef DO_INACTIVE
     for (int i = 0, j = 0; i < children; i++, j = (j+1)%num_processors) {
         if (child_pids[i]) {
-            printf("do_sys_call... %d\n", child_pids[i]);
+            // printf("do_sys_call... %d\n", child_pids[i]);
             if (syscall(sys_set_inactive_pid, child_pids[i], j, 60000LL) < 0) {
                 syscall(sys_set_inactive_pid); // just to be safe....
                 exit(EXIT_FAILURE);
             }
         }
     }
+#endif
 
     for (int i = 0; i < children; i++) {
         if (child_pids[i]) {
