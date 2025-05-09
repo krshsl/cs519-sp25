@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/fair.c.orig	2025-05-09 00:54:38.935067146 -0600
-+++ ./linux-5.15.0/kernel/sched/fair.c	2025-05-09 01:39:33.016026493 -0600
++++ ./linux-5.15.0/kernel/sched/fair.c	2025-05-09 01:58:24.156767759 -0600
 @@ -21,6 +21,7 @@
   *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
   */
@@ -33,7 +33,7 @@
 +
 +    if (cpu->counter <= 1) {
 +        // if no input?? or only one input, allow preemption
-+        LOG_FUNCS(KERN_INFO, "Ends no need... %d::%d::%llu", p->inactive_cpu, p->pid, node->preempt_time);
++        LOG_FUNCS(KERN_INFO, "Ends no need... %d::%d", p->inactive_cpu, p->pid);
 +        return total;
 +    }
 +    raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
@@ -43,7 +43,7 @@
 +        list_for_each(cursor, &cpu->proc_list) {
 +            node = list_entry(cursor, struct inactive_tasks, head);
 +            if (node->pid == p->pid) break;
-+            total += node->active_time; // how long should this will be inactive is based on other active nodes
++            total += node->active_time; // inactive is based on other active nodes
 +        }
 +
 +        raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
@@ -63,7 +63,7 @@
 +    list_for_each(cursor, &cpu->proc_list) { // loop till end of list
 +        node = list_entry(cursor, struct inactive_tasks, head);
 +        if (node->pid == p->pid) break;
-+        total += node->active_time; // how long should this will be inactive is based on other active nodes
++        total += node->active_time; // inactive is based on other active nodes
 +    }
 +	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +	LOG_FUNCS(KERN_INFO, "Ends try again... %d::%d::%llu", p->inactive_cpu, p->pid, node->preempt_time);
