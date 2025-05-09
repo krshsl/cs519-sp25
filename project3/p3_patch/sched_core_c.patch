@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-07 16:58:08.946133446 -0600
-+++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 21:38:18.194325046 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 22:03:18.194053477 -0600
 @@ -6,6 +6,10 @@
   *
   *  Copyright (C) 1991-2002  Linus Torvalds
@@ -22,7 +22,7 @@
  /*
   * Export tracepoints that act as a bare tracehook (ie: have no trace event
   * associated with them) to allow external modules to probe them.
-@@ -2088,13 +2096,65 @@
+@@ -2088,12 +2096,67 @@
  		p->sched_class->prio_changed(rq, p, oldprio);
  }
  
@@ -31,7 +31,7 @@
 + * 1: continue
 + * 0: do not reschedule
 +*/
-+u64 is_inactive_preempt(struct rq *rq, struct task_struct *p, int flags) {
++int is_inactive_preempt(struct rq *rq, struct task_struct *p, int flags) {
 +    struct inactive_cpu *cpu;
 +    struct inactive_tasks *node = NULL;
 +    unsigned long cpu_flags;
@@ -70,7 +70,7 @@
 +	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +	LOG_FUNCS(KERN_INFO, "Ends... %d::%d::%llu", p->inactive_cpu, p->pid, node->preempt_time);
 +	dequeue_task(rq, p, flags);
-+    p->se.vruntime += node->active_time; // it can only exec after a rather long time???
++    p->se.vruntime += 10000LL; // it can only exec again after a min time???
 +    enqueue_task(rq, p, flags);
 +    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +	return 0; // preemption is not allowed, let the next task run now
@@ -78,21 +78,21 @@
 +
  void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
  {
--	if (p->sched_class == rq->curr->sched_class)
++    if (is_inactive_preempt(rq, p, flags) == 0) {
++        return; //do not prempt
++    }
++
+ 	if (p->sched_class == rq->curr->sched_class)
 -		rq->curr->sched_class->check_preempt_curr(rq, p, flags);
--	else if (p->sched_class > rq->curr->sched_class)
-+	if (p->sched_class == rq->curr->sched_class) {
-+	    if (is_inactive_preempt(rq, p, flags)) {
-+	        rq->curr->sched_class->check_preempt_curr(rq, p, flags);
-+		}
-+	} else if (p->sched_class > rq->curr->sched_class) {
- 		resched_curr(rq);
--
-+	}
++	    rq->curr->sched_class->check_preempt_curr(rq, p, flags);
+ 	else if (p->sched_class > rq->curr->sched_class)
+-		resched_curr(rq);
++	    resched_curr(rq);
++
+ 
  	/*
  	 * A queue event has occurred, and we're going to schedule.  In
- 	 * this case, we can save a useless back to back clock update.
-@@ -9546,6 +9606,13 @@
+@@ -9546,6 +9609,13 @@
  #endif
  	}
  
@@ -106,7 +106,7 @@
  	set_load_weight(&init_task, false);
  
  	/*
-@@ -10981,3 +11048,58 @@
+@@ -10981,3 +11051,58 @@
  {
          trace_sched_update_nr_running_tp(rq, count);
  }
