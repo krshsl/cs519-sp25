@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-07 16:58:08.946133446 -0600
-+++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 18:52:20.577500591 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 20:04:57.002343869 -0600
 @@ -6,6 +6,10 @@
   *
   *  Copyright (C) 1991-2002  Linus Torvalds
@@ -36,12 +36,12 @@
  	set_load_weight(&init_task, false);
  
  	/*
-@@ -10981,3 +10996,82 @@
+@@ -10981,3 +10996,55 @@
  {
          trace_sched_update_nr_running_tp(rq, count);
  }
 +
-+SYSCALL_DEFINE2(set_inactive_pid, int, upid, unsigned long long, inactive_time) {
++SYSCALL_DEFINE3(set_inactive_pid, int, upid, int, task_core, unsigned long long, inactive_time) {
 +    struct task_struct *p;
 +    struct inactive_cpu *cpu = NULL;
 +    struct inactive_tasks *task = NULL;
@@ -50,7 +50,6 @@
 +    struct list_head *tmp = NULL;
 +    unsigned long cpu_flags;
 +    struct pid* pid;
-+    int task_core;
 +
 +    LOG_FUNCS(KERN_INFO, "Begins... %d::%d::%d", current->pid, upid, smp_processor_id());
 +    pid = find_vpid(upid);
@@ -60,7 +59,6 @@
 +        return 0; // process has already exited, no need to add...
 +    }
 +
-+    task_core = task_cpu(p);
 +    inactive_time = max_t(u64, inactive_time, 20000LL); // inactive_time should atleast be 2 times the sched val...
 +    LOG_FUNCS(KERN_INFO, "%d:%d:%d:%llu", current->pid, upid, task_core, inactive_time);
 +    cpu = &per_cpu(ia_cpu_queue, task_core);
@@ -89,33 +87,8 @@
 +        cpu->counter++;
 +    }
 +    p->inactive_tracker = current->pid; // parent pid added to inactive tracker
++    p->inactive_cpu = task_core;
 +    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +    LOG_FUNCS(KERN_INFO, "Ends... %d::%d::%d", current->pid, upid, smp_processor_id());
-+    return 0;
-+}
-+
-+SYSCALL_DEFINE0(del_inactive_pids) {
-+    struct inactive_cpu *cpu;
-+    struct inactive_tasks *task, *t_tmp;
-+    unsigned long cpu_flags;
-+    int i;
-+
-+    LOG_FUNCS(KERN_INFO, "Begins... %d", current->pid);
-+    // is this even required though??
-+    for_each_possible_cpu(i) {
-+        cpu = &per_cpu(ia_cpu_queue, i);
-+        LOG_FUNCS(KERN_INFO, "%d::%d::%d", smp_processor_id(), i, cpu->counter);
-+        if (cpu->counter) {
-+            raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
-+            list_for_each_entry_safe(task, t_tmp, &cpu->proc_list, head) {
-+                list_del(&task->head);
-+                cpu->counter--;
-+                LOG_FUNCS(KERN_INFO, "Key removed... %d::%u", task->pid, i);
-+                kfree(task);
-+            }
-+            raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
-+        }
-+    }
-+    LOG_FUNCS(KERN_INFO, "Ends... %d", current->pid);
 +    return 0;
 +}

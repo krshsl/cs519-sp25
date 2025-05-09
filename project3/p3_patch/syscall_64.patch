@@ -1,11 +1,10 @@
 --- ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl.orig	2025-05-07 18:38:31.066745815 -0600
-+++ ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-05-08 15:06:37.439649644 -0600
-@@ -343,6 +343,8 @@
++++ ./linux-5.15.0/arch/x86/entry/syscalls/syscall_64.tbl	2025-05-08 19:56:45.167966145 -0600
+@@ -343,6 +343,7 @@
  332	common	statx			sys_statx
  333	common	io_pgetevents		sys_io_pgetevents
  334	common	rseq			sys_rseq
 +336 common  set_inactive_pid    sys_set_inactive_pid
-+337 common  del_inactive_pids    sys_del_inactive_pids
  # don't use numbers 387 through 423, add new calls after the last
  # 'common' entry
  424	common	pidfd_send_signal	sys_pidfd_send_signal

@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/fair.c.orig	2025-05-08 18:42:41.293121612 -0600
-+++ ./linux-5.15.0/kernel/sched/fair.c	2025-05-08 18:57:44.330111633 -0600
++++ ./linux-5.15.0/kernel/sched/fair.c	2025-05-08 19:56:02.899368593 -0600
 @@ -22,6 +22,8 @@
   */
  #include "sched.h"
@@ -9,7 +9,7 @@
  /*
   * Targeted preemption latency for CPU-bound tasks:
   *
-@@ -820,6 +822,39 @@
+@@ -820,6 +822,40 @@
  #endif /* CONFIG_SMP */
  
  /*
@@ -22,14 +22,13 @@
 +        return 0LL;
 +    }
 +
-+    int task_core = task_cpu(tsk);
-+    struct inactive_cpu *cpu = &per_cpu(ia_cpu_queue, task_core); // techincally it should be the same cpu, but why bother
++    struct inactive_cpu *cpu = &per_cpu(ia_cpu_queue, tsk->inactive_cpu); // techincally it should be the same cpu, but why bother
 +    struct list_head *cursor = NULL, *tmp = NULL;
 +    struct inactive_tasks *node = NULL;
 +    unsigned long cpu_flags;
 +    u64 total = 0;
 +
-+    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", task_core, tsk->pid);
++    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", tsk->inactive_cpu, tsk->pid);
 +    if (cpu->counter == 0) { // no input present???
 +        return 0;
 +    }
@@ -37,11 +36,13 @@
 +    raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
 +	list_for_each_safe(cursor, tmp, &cpu->proc_list) {
 +	    node = list_entry(cursor, struct inactive_tasks, head);
-+		total += node->inactive_time;
 +		if (node->pid == tsk->pid) break;
++
++		// current process should not get affected by it's time, but i want the other process to take longer time
++		total += node->inactive_time;
 +	}
 +	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
-+	LOG_FUNCS(KERN_INFO, "Ends... %d::%d::%llu", task_core, tsk->pid, total);
++	LOG_FUNCS(KERN_INFO, "Ends... %d::%d::%llu", tsk->inactive_cpu, tsk->pid, total);
 +	return total;
 +}
 +
@@ -49,7 +50,7 @@
   * Update the current task's runtime statistics.
   */
  static void update_curr(struct cfs_rq *cfs_rq)
-@@ -848,7 +883,7 @@
+@@ -848,7 +884,7 @@
  	curr->sum_exec_runtime += delta_exec;
  	schedstat_add(cfs_rq->exec_clock, delta_exec);
  
