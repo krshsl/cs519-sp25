@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-07 16:58:08.946133446 -0600
-+++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 20:04:57.002343869 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 21:03:19.315919426 -0600
 @@ -6,6 +6,10 @@
   *
   *  Copyright (C) 1991-2002  Linus Torvalds
@@ -22,7 +22,64 @@
  /*
   * Export tracepoints that act as a bare tracehook (ie: have no trace event
   * associated with them) to allow external modules to probe them.
-@@ -9546,6 +9554,13 @@
+@@ -2088,13 +2096,52 @@
+ 		p->sched_class->prio_changed(rq, p, oldprio);
+ }
+ 
++
++/*
++ * 1: continue
++ * 0: do not reschedule
++*/
++u64 is_inactive_preempt(struct task_struct *tsk) {
++    struct inactive_cpu *cpu = &per_cpu(ia_cpu_queue, tsk->inactive_cpu); // techincally it should be the same cpu, but why bother
++    struct inactive_tasks *node = NULL;
++    unsigned long cpu_flags;
++    u64 now = ktime_get_ns();
++    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", tsk->inactive_cpu, tsk->pid);
++
++    if (cpu->counter <= 1) {
++        // if no input?? or only one input, allow preemption
++        return 1;
++    }
++    raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
++    node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head);
++
++    if (node->pid != tsk->pid) {
++        raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++        return 0; // do not, task ids are not the same!!!
++    }
++
++    if (now < node->preempt_time) {
++        raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++        return 1; // preemption allowed
++    }
++    list_del(&node->head); // pop and add to back of queue
++    list_add_tail(&node->head, &cpu->proc_list);
++    node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head);
++    node->preempt_time = now+node->active_time; // new head gets updated time
++	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++	LOG_FUNCS(KERN_INFO, "Ends... %d::%d::%llu", tsk->inactive_cpu, tsk->pid, node->preempt_time);
++	return 0; // preemption is not allowed, let the next task run now
++}
++
+ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
+ {
+-	if (p->sched_class == rq->curr->sched_class)
+-		rq->curr->sched_class->check_preempt_curr(rq, p, flags);
+-	else if (p->sched_class > rq->curr->sched_class)
++	if (p->sched_class == rq->curr->sched_class) {
++	    if (p->inactive_tracker == -1 || is_inactive_preempt(p)) {
++	        rq->curr->sched_class->check_preempt_curr(rq, p, flags);
++		}
++	} else if (p->sched_class > rq->curr->sched_class) {
+ 		resched_curr(rq);
+-
++	}
+ 	/*
+ 	 * A queue event has occurred, and we're going to schedule.  In
+ 	 * this case, we can save a useless back to back clock update.
+@@ -9546,6 +9593,13 @@
  #endif
  	}
  
@@ -36,12 +93,12 @@
  	set_load_weight(&init_task, false);
  
  	/*
-@@ -10981,3 +10996,55 @@
+@@ -10981,3 +11035,58 @@
  {
          trace_sched_update_nr_running_tp(rq, count);
  }
 +
-+SYSCALL_DEFINE3(set_inactive_pid, int, upid, int, task_core, unsigned long long, inactive_time) {
++SYSCALL_DEFINE3(set_inactive_pid, int, upid, int, task_core, unsigned long long, active_time) {
 +    struct task_struct *p;
 +    struct inactive_cpu *cpu = NULL;
 +    struct inactive_tasks *task = NULL;
@@ -59,8 +116,9 @@
 +        return 0; // process has already exited, no need to add...
 +    }
 +
-+    inactive_time = max_t(u64, inactive_time, 20000LL); // inactive_time should atleast be 2 times the sched val...
-+    LOG_FUNCS(KERN_INFO, "%d:%d:%d:%llu", current->pid, upid, task_core, inactive_time);
++    active_time = max_t(u64, active_time, 20000LL); // active_time should atleast be 2 times the sched val...
++    // active_time minf value is required as well, not adding atm
++    LOG_FUNCS(KERN_INFO, "%d:%d:%d:%llu", current->pid, upid, task_core, active_time);
 +    cpu = &per_cpu(ia_cpu_queue, task_core);
 +    if (cpu == NULL) { // can never be null cause it is always supposed to exist??
 +        LOG_FUNCS(KERN_INFO, "Something seriously broke in %d::%d, but what did???", current->pid, task_core);
@@ -76,12 +134,14 @@
 +
 +    if (task) {
 +        LOG_FUNCS(KERN_INFO, "Existing key updated... %d::%d", upid, task_core);
-+        task->inactive_time = inactive_time;
++        task->active_time = active_time;
++        // if we update start_time here, people can abuse this impl
 +    } else {
 +        LOG_FUNCS(KERN_INFO, "New Key added... %d::%d", upid, task_core);
 +        task = kmalloc(sizeof(struct inactive_tasks), GFP_KERNEL);
 +        task->pid = upid;
-+        task->inactive_time = inactive_time;
++        task->active_time = active_time;
++        task->preempt_time = ktime_get_ns()+active_time;
 +        INIT_LIST_HEAD(&task->head);
 +        list_add_tail(&task->head, &cpu->proc_list);
 +        cpu->counter++;
