@@ -34,10 +34,6 @@
 #define sys_set_inactive_pid 336
 #endif
 
-#ifndef sys_del_inactive_pids
-#define sys_del_inactive_pids 337
-#endif
-
 //Add all your global variables and definitions here.
 #define MATRIX_SIZE 10000
 // floating point precision issues if value exceeds certain thresholds
@@ -220,6 +216,7 @@ void child_worker(float **matrix1, float **matrix2, float **result, int id) {
 	// printf("Child %d::%d started\n", id, getpid());
 	struct timespec start_time, end_time;
 	int end = MATRIX_SIZE/8;
+	int local_count = 0;
 	for (int i = id; i < MATRIX_SIZE; i+=maxCores) {
 		float *r = result[i];
 		int k = 0;
@@ -283,10 +280,20 @@ void child_worker(float **matrix1, float **matrix2, float **result, int id) {
 			}
 		}
 		clock_gettime(CLOCK_MONOTONIC_RAW, &end_time);
+
+#ifdef DO_YIELD
+        sched_yield();
+#endif
+
+		if (local_count > 2) {
+		    continue; // micro opt
+		}
+
 		pthread_mutex_lock(&active_time->mutex);
 		active_time->proc_time = MAXF(active_time->proc_time, elapsed_ns(start_time, end_time));
 		active_time->counter++;
 		pthread_mutex_unlock(&active_time->mutex);
+		local_count++;
 	}
 	// printf("Child %d::%d finished\n", id, getpid());
 	exit(0);
@@ -320,15 +327,17 @@ void wait_workers(pid_t *children) {
         sched_yield();
     }
 
-    for (int i = 0; i < maxCores; i++) {
+#ifdef DO_INACTIVE
+    for (int i = 0, j = 0; i < maxCores; i++, j = (j+1)%maxAllowedCores) {
         if (children[i]) {
-            if (syscall(sys_del_inactive_pids, children[i], active_time->proc_time) < 0) {
+            if (syscall(sys_set_inactive_pid, children[i], j, active_time->proc_time) < 0) {
                 perror("syscall set_inactive (test)");
-                syscall(sys_del_inactive_pids); // just to be safe....
+                syscall(sys_set_inactive_pid); // just to be safe....
                 exit(EXIT_FAILURE);
             }
         }
     }
+#endif
 
 	for (int i = 0; i < maxCores; i++) {
 		wait(NULL);
@@ -515,6 +524,5 @@ int main(int argc, char const *argv[]) {
 	free_matrix(matrix2, MATRIX_SIZE);
     free_shm_matrix(result);
     free_active_time();
-    syscall(sys_del_inactive_pids); // not possible to get -ve vals???
 	return 0;
 }

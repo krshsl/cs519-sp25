@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 
 func_modes = {
     "shmem": {
-        "1": "shmem small",
-        "2": "shmem large"
+        "1": "shmem no change",
+        "2": "shmem syscall added",
+        "3": "shmem with yield"
     }
 }
 
@@ -293,12 +294,12 @@ def generate_perf_plots():
     # Generate cpu utilization plots
     generate_cpu_utilization_plots(df)
 
-    generate_additional_plots(df, summary_df, [10000], "large")
+    generate_additional_plots(df, summary_df, [8192], "large")
 
 def main():
     """Main function to execute the benchmark tests."""
     # Parameters
-    matrix_sizes = [10000]
+    matrix_sizes = [8192]
     core_counts = [16, 32, 40, 48, 64, 96]
     runs_per_test = 10
 

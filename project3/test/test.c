@@ -15,10 +15,6 @@
 #define sys_set_inactive_pid 336
 #endif
 
-#ifndef sys_del_inactive_pids
-#define sys_del_inactive_pids 337
-#endif
-
 
 int main(int argc, char *argv[]) {
     // int num_processors = (int)sysconf(_SC_NPROCESSORS_ONLN);
@@ -68,13 +64,12 @@ int main(int argc, char *argv[]) {
         child_pids[i] = pid;
     }
 
-    for (int i = 0; i < children; i++) {
+    for (int i = 0, j = 0; i < children; i++, j = (j+1)%num_processors) {
         if (child_pids[i]) {
             printf("do_sys_call... %d\n", child_pids[i]);
-            if (syscall(sys_set_inactive_pid, child_pids[i], 60000LL) < 0) {
-                printf("syscall failed since child_pid::%d exited...\n", child_pids[i]);
-                // syscall(sys_set_inactive_pid); // just to be safe....
-                // exit(EXIT_FAILURE);
+            if (syscall(sys_set_inactive_pid, child_pids[i], j, 60000LL) < 0) {
+                syscall(sys_set_inactive_pid); // just to be safe....
+                exit(EXIT_FAILURE);
             }
         }
     }
@@ -86,7 +81,5 @@ int main(int argc, char *argv[]) {
     }
 
     free(child_pids);
-    printf("sys_del_inactive_pids\n");
-    syscall(sys_del_inactive_pids); // not possible to get -ve vals???
     exit(EXIT_SUCCESS);
 }
