@@ -1,5 +1,5 @@
---- ./linux-5.15.0/kernel/exit.c.orig	2025-05-08 18:43:23.585742882 -0600
-+++ ./linux-5.15.0/kernel/exit.c	2025-05-08 20:36:54.159164329 -0600
+--- ./linux-5.15.0/kernel/exit.c.orig	2025-05-09 00:32:24.827892863 -0600
++++ ./linux-5.15.0/kernel/exit.c	2025-05-09 00:46:48.809670390 -0600
 @@ -65,6 +65,7 @@
  #include <linux/compat.h>
  #include <linux/io_uring.h>
@@ -14,7 +14,7 @@
  
 +void remove_inactive_task(struct task_struct *tsk) {
 +    struct inactive_cpu *cpu = NULL;
-+    struct list_head *cursor = NULL, *tmp = NULL;
++    struct list_head *cursor = NULL;
 +    struct inactive_tasks *node = NULL;
 +    unsigned long cpu_flags;
 +    if (tsk->inactive_tracker == -1) {
@@ -28,7 +28,7 @@
 +    }
 +
 +    raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
-+	list_for_each_safe(cursor, tmp, &cpu->proc_list) {
++	list_for_each(cursor, &cpu->proc_list) {
 +	    node = list_entry(cursor, struct inactive_tasks, head);
 +		if (node->pid != tsk->pid) continue;
 +		cpu->counter--;

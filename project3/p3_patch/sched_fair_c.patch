@@ -1,0 +1,94 @@
+--- ./linux-5.15.0/kernel/sched/fair.c.orig	2025-05-09 00:54:38.935067146 -0600
++++ ./linux-5.15.0/kernel/sched/fair.c	2025-05-09 00:54:45.095165116 -0600
+@@ -21,6 +21,7 @@
+  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
+  */
+ #include "sched.h"
++#include <linux/my_inactive.h>
+ 
+ /*
+  * Targeted preemption latency for CPU-bound tasks:
+@@ -820,6 +821,65 @@
+ #endif /* CONFIG_SMP */
+ 
+ /*
++ * 1: continue
++ * 0: do not reschedule, i.e., try again
++*/
++u64 is_inactive_preempt(void) {
++    struct task_struct *p = current;
++    struct list_head *cursor = NULL;
++    struct inactive_cpu *cpu = NULL;
++    struct inactive_tasks *node = NULL;
++    unsigned long cpu_flags;
++    u64 now;
++    u64 total = 0LL;
++
++    if (p && p->inactive_tracker == -1) {
++        return total;
++    }
++    cpu = &per_cpu(ia_cpu_queue, p->inactive_cpu); // techincally it should be the same cpu, but why bother
++    now = ktime_get_ns();
++    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", p->inactive_cpu, p->pid);
++
++    if (cpu->counter <= 1) {
++        // if no input?? or only one input, allow preemption
++        LOG_FUNCS(KERN_INFO, "Ends no need... %d::%d::%llu", p->inactive_cpu, p->pid, node->preempt_time);
++        return total;
++    }
++    raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
++    node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head);
++
++    if (node->pid != p->pid) {
++        list_for_each(cursor, &cpu->proc_list) {
++            node = list_entry(cursor, struct inactive_tasks, head);
++            if (node->pid == p->pid) break;
++            total += node->active_time; // how long should this will be inactive is based on other active nodes
++        }
++
++        raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++        LOG_FUNCS(KERN_INFO, "Ends not pid... %d::%d::%llu", p->inactive_cpu, p->pid, node->preempt_time);
++        return total; // do not, task ids are not the same!!!
++    }
++
++    if (now < node->preempt_time) {
++        raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++        LOG_FUNCS(KERN_INFO, "Ends maybe later... %d::%d::%llu", p->inactive_cpu, p->pid, node->preempt_time);
++        return total; // preemption allowed
++    }
++    list_del(&node->head); // pop and add to back of queue
++    list_add_tail(&node->head, &cpu->proc_list);
++    node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head);
++    node->preempt_time = now+node->active_time; // new head gets updated time
++    list_for_each(cursor, &cpu->proc_list) { // loop till end of list
++        node = list_entry(cursor, struct inactive_tasks, head);
++        if (node->pid == p->pid) break;
++        total += node->active_time; // how long should this will be inactive is based on other active nodes
++    }
++	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
++	LOG_FUNCS(KERN_INFO, "Ends try again... %d::%d::%llu", p->inactive_cpu, p->pid, node->preempt_time);
++	return total; // preemption is not allowed, let the next task run now
++}
++
++/*
+  * Update the current task's runtime statistics.
+  */
+ static void update_curr(struct cfs_rq *cfs_rq)
+@@ -848,7 +908,7 @@
+ 	curr->sum_exec_runtime += delta_exec;
+ 	schedstat_add(cfs_rq->exec_clock, delta_exec);
+ 
+-	curr->vruntime += calc_delta_fair(delta_exec, curr);
++	curr->vruntime += calc_delta_fair(delta_exec, curr)+is_inactive_preempt();
+ 	update_min_vruntime(cfs_rq);
+ 
+ 	if (entity_is_task(curr)) {
+@@ -4703,6 +4763,8 @@
+ static int
+ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
+ 
++
++
+ /*
+  * Pick the next process, keeping these things in mind, in this order:
+  * 1) keep things fair between processes/task groups

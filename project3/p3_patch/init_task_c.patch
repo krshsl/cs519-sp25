@@ -1,5 +1,5 @@
---- ./linux-5.15.0/init/init_task.c.orig	2025-05-08 15:25:21.911800849 -0600
-+++ ./linux-5.15.0/init/init_task.c	2025-05-08 15:25:27.407887005 -0600
+--- ./linux-5.15.0/init/init_task.c.orig	2025-05-09 00:32:24.815892746 -0600
++++ ./linux-5.15.0/init/init_task.c	2025-05-09 00:32:24.871893292 -0600
 @@ -72,6 +72,7 @@
  	.stack_refcount	= REFCOUNT_INIT(1),
  #endif

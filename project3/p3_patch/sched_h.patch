@@ -1,5 +1,5 @@
---- ./linux-5.15.0/include/linux/sched.h.orig	2025-05-07 16:58:22.338308897 -0600
-+++ ./linux-5.15.0/include/linux/sched.h	2025-05-08 19:54:32.586095464 -0600
+--- ./linux-5.15.0/include/linux/sched.h.orig	2025-05-09 00:32:24.819892785 -0600
++++ ./linux-5.15.0/include/linux/sched.h	2025-05-09 00:32:24.911893683 -0600
 @@ -735,6 +735,8 @@
  	 */
  	randomized_struct_fields_start
