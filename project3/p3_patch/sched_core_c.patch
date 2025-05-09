@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/core.c.orig	2025-05-07 16:58:08.946133446 -0600
-+++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 21:03:19.315919426 -0600
++++ ./linux-5.15.0/kernel/sched/core.c	2025-05-08 21:38:18.194325046 -0600
 @@ -6,6 +6,10 @@
   *
   *  Copyright (C) 1991-2002  Linus Torvalds
@@ -22,7 +22,7 @@
  /*
   * Export tracepoints that act as a bare tracehook (ie: have no trace event
   * associated with them) to allow external modules to probe them.
-@@ -2088,13 +2096,52 @@
+@@ -2088,13 +2096,65 @@
  		p->sched_class->prio_changed(rq, p, oldprio);
  }
  
@@ -31,12 +31,18 @@
 + * 1: continue
 + * 0: do not reschedule
 +*/
-+u64 is_inactive_preempt(struct task_struct *tsk) {
-+    struct inactive_cpu *cpu = &per_cpu(ia_cpu_queue, tsk->inactive_cpu); // techincally it should be the same cpu, but why bother
++u64 is_inactive_preempt(struct rq *rq, struct task_struct *p, int flags) {
++    struct inactive_cpu *cpu;
 +    struct inactive_tasks *node = NULL;
 +    unsigned long cpu_flags;
-+    u64 now = ktime_get_ns();
-+    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", tsk->inactive_cpu, tsk->pid);
++    u64 now;
++
++    if (p->inactive_tracker == -1) {
++        return 1;
++    }
++    cpu = &per_cpu(ia_cpu_queue, p->inactive_cpu); // techincally it should be the same cpu, but why bother
++    now = ktime_get_ns();
++    LOG_FUNCS(KERN_INFO, "Begins... %d::%d", p->inactive_cpu, p->pid);
 +
 +    if (cpu->counter <= 1) {
 +        // if no input?? or only one input, allow preemption
@@ -45,7 +51,10 @@
 +    raw_spin_lock_irqsave(&cpu->lock, cpu_flags);
 +    node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head);
 +
-+    if (node->pid != tsk->pid) {
++    if (node->pid != p->pid) {
++        dequeue_task(rq, p, flags);
++        p->se.vruntime += node->active_time; // it can only exec after a rather long time???
++        enqueue_task(rq, p, flags);
 +        raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +        return 0; // do not, task ids are not the same!!!
 +    }
@@ -59,7 +68,11 @@
 +    node = list_first_entry(&cpu->proc_list, struct inactive_tasks, head);
 +    node->preempt_time = now+node->active_time; // new head gets updated time
 +	raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
-+	LOG_FUNCS(KERN_INFO, "Ends... %d::%d::%llu", tsk->inactive_cpu, tsk->pid, node->preempt_time);
++	LOG_FUNCS(KERN_INFO, "Ends... %d::%d::%llu", p->inactive_cpu, p->pid, node->preempt_time);
++	dequeue_task(rq, p, flags);
++    p->se.vruntime += node->active_time; // it can only exec after a rather long time???
++    enqueue_task(rq, p, flags);
++    raw_spin_unlock_irqrestore(&cpu->lock, cpu_flags);
 +	return 0; // preemption is not allowed, let the next task run now
 +}
 +
@@ -69,7 +82,7 @@
 -		rq->curr->sched_class->check_preempt_curr(rq, p, flags);
 -	else if (p->sched_class > rq->curr->sched_class)
 +	if (p->sched_class == rq->curr->sched_class) {
-+	    if (p->inactive_tracker == -1 || is_inactive_preempt(p)) {
++	    if (is_inactive_preempt(rq, p, flags)) {
 +	        rq->curr->sched_class->check_preempt_curr(rq, p, flags);
 +		}
 +	} else if (p->sched_class > rq->curr->sched_class) {
@@ -79,7 +92,7 @@
  	/*
  	 * A queue event has occurred, and we're going to schedule.  In
  	 * this case, we can save a useless back to back clock update.
-@@ -9546,6 +9593,13 @@
+@@ -9546,6 +9606,13 @@
  #endif
  	}
  
@@ -93,7 +106,7 @@
  	set_load_weight(&init_task, false);
  
  	/*
-@@ -10981,3 +11035,58 @@
+@@ -10981,3 +11048,58 @@
  {
          trace_sched_update_nr_running_tp(rq, count);
  }
