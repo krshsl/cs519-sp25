@@ -1,6 +1,7 @@
 // lscpu | egrep -i 'core.*:|socket'
-// time -p ./test.o 2 16 1000000
-// make; ./test.o 2 2 100 &;  sudo dmesg -we
+// time -p ./test_1.o 2 16 1000000
+// time -p ./test_2.o 2 16 1000000
+// make; ./test_2.o 2 2 100 &;  sudo dmesg -we
 #define _GNU_SOURCE
 #include <err.h>
 #include <sched.h>

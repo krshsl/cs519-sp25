@@ -41,7 +41,7 @@ def compile_and_run(method, modes, matrix_size, cores, runs_per_test):
     # Run multiple times
     for mode in modes:
         for run in range(runs_per_test):
-            binary = f"./{method}_{mode}"
+            binary = f"./{method}_{mode}.o"
             print(f"Run {run+1}/{runs_per_test}: Executing {binary}")
 
             cmd = ["/usr/bin/time", "-f", "%e,%U,%S", "-q", binary, "-p"]
@@ -96,57 +96,41 @@ def save_results(df):
     print("Testing completed. Results saved to ipc_benchmark_results.csv and ipc_benchmark_summary.csv")
 
 def generate_plots(df):
-    """Generate performance plots for each method with separate graphs for small and large matrices."""
+    """Generate performance plots comparing all methods on the same graph."""
     sns.set(style="darkgrid")
+    os.makedirs("images", exist_ok=True)
 
-    for method in df['Method'].unique():
-        # Small matrices (below 8192)
-        small_data = df[(df['Method'] == method) & (df['MatrixSize'] < 8192)]
-        if not small_data.empty:
-            plt.figure(figsize=(12, 8))
+    # Plot all methods together on the same graph
+    # Small matrices (above 1024)
+    small_data = df[df['MatrixSize'] > 1024]
+    if not small_data.empty:
+        plt.figure(figsize=(12, 8))
 
-            sns.lineplot(
-                data=small_data,
-                x='Cores',
-                y='TimeTaken',
-                hue='MatrixSize',
-                marker='o',
-                palette='viridis',
-            )
+        # Create a new column that combines Method and MatrixSize for the legend
+        small_data['Method_Size'] = small_data.apply(
+            lambda row: f"{row['Method']} - {row['MatrixSize']}", axis=1
+        )
 
-            plt.title(f'Performance of {method.upper()} method (Matrix Size < 8192)', fontsize=16)
-            plt.xlabel('Number of Cores', fontsize=14)
-            plt.ylabel('Time Taken (seconds)', fontsize=14)
-            plt.legend(title='Matrix Size', fontsize=12, loc='center left', bbox_to_anchor=(1, 0.5))
-            plt.grid(True)
-            plt.tight_layout()
+        sns.lineplot(
+            data=small_data,
+            x='Cores',
+            y='TimeTaken',
+            hue='Method_Size',
+            style='Method',
+            markers=True,
+            dashes=False,
+            palette='viridis',
+        )
 
-            plt.savefig(f'images/{method}_small_matrix_performance.png', bbox_inches='tight')
-            print(f"Created graph for {method} method with small matrices (saved as {method}_small_matrix_performance.png)")
+        plt.title('Performance Comparison', fontsize=16)
+        plt.xlabel('Number of Cores', fontsize=14)
+        plt.ylabel('Time Taken (seconds)', fontsize=14)
+        plt.legend(fontsize=12, loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.grid(True)
+        plt.tight_layout()
 
-        # Large matrices (8192 and above)
-        large_data = df[(df['Method'] == method) & (df['MatrixSize'] >= 8192)]
-        if not large_data.empty:
-            plt.figure(figsize=(12, 8))
-
-            sns.lineplot(
-                data=large_data,
-                x='Cores',
-                y='TimeTaken',
-                hue='MatrixSize',
-                marker='o',
-                palette='viridis',
-            )
-
-            plt.title(f'Performance of {method.upper()} method (Matrix Size ≥ 8192)', fontsize=16)
-            plt.xlabel('Number of Cores', fontsize=14)
-            plt.ylabel('Time Taken (seconds)', fontsize=14)
-            plt.legend(title='Matrix Size', fontsize=12, loc='center left', bbox_to_anchor=(1, 0.5))
-            plt.grid(True)
-            plt.tight_layout()
-
-            plt.savefig(f'images/{method}_large_matrix_performance.png', bbox_inches='tight')
-            print(f"Created graph for {method} method with large matrices (saved as {method}_large_matrix_performance.png)")
+        plt.savefig('images/matrix_performance.png', bbox_inches='tight')
+        print("Created performance graph comparing all methods with small matrices")
 
     plt.close('all')
 
@@ -157,54 +141,37 @@ def generate_cpu_utilization_plots(df):
     # Calculate CPU utilization
     df['CPUUtilization'] = (df['UserTime'] + df['SysTime'] + df['TimeTaken'] - df['RealTime']) / (df['TimeTaken'] * df['Cores']) * 100
 
-    for method in df['Method'].unique():
-        # Small matrices (below 8192)
-        small_data = df[(df['Method'] == method) & (df['MatrixSize'] < 8192) & (df['Cores'] <= 40)]
-        if not small_data.empty:
-            plt.figure(figsize=(12, 8))
+    # Plot all methods together on the same graph
+    # Small matrices (above 1024)
+    small_data = df[df['MatrixSize'] > 1024]
+    if not small_data.empty:
+        plt.figure(figsize=(12, 8))
 
-            sns.lineplot(
-                data=small_data,
-                x='Cores',
-                y='CPUUtilization',
-                hue='MatrixSize',
-                marker='o',
-                palette='viridis',
-            )
+        # Create a new column that combines Method and MatrixSize for the legend
+        small_data['Method_Size'] = small_data.apply(
+            lambda row: f"{row['Method']} - {row['MatrixSize']}", axis=1
+        )
 
-            plt.title(f'CPU Utilization of {method.upper()} method (Matrix Size < 8192)', fontsize=16)
-            plt.xlabel('Number of Cores', fontsize=14)
-            plt.ylabel('CPU Utilization (%)', fontsize=14)
-            plt.legend(title='Matrix Size', fontsize=12, loc='center left', bbox_to_anchor=(1, 0.5))
-            plt.grid(True)
-            plt.tight_layout()
+        sns.lineplot(
+            data=small_data,
+            x='Cores',
+            y='CPUUtilization',
+            hue='Method_Size',
+            style='Method',
+            markers=True,
+            dashes=False,
+            palette='viridis',
+        )
 
-            plt.savefig(f'images/{method}_small_matrix_cpu_utilization.png', bbox_inches='tight')
-            print(f"Created CPU utilization graph for {method} method with small matrices (saved as {method}_small_matrix_cpu_utilization.png)")
+        plt.title(f'CPU Utilization Comparison', fontsize=16)
+        plt.xlabel('Number of Cores', fontsize=14)
+        plt.ylabel('CPU Utilization (%)', fontsize=14)
+        plt.legend(fontsize=12, loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.grid(True)
+        plt.tight_layout()
 
-        # Large matrices (8192 and above)
-        large_data = df[(df['Method'] == method) & (df['MatrixSize'] >= 8192) & (df['Cores'] <= 40)]
-        if not large_data.empty:
-            plt.figure(figsize=(12, 8))
-
-            sns.lineplot(
-                data=large_data,
-                x='Cores',
-                y='CPUUtilization',
-                hue='MatrixSize',
-                marker='o',
-                palette='viridis',
-            )
-
-            plt.title(f'CPU Utilization of {method.upper()} method (Matrix Size ≥ 8192)', fontsize=16)
-            plt.xlabel('Number of Cores', fontsize=14)
-            plt.ylabel('CPU Utilization (%)', fontsize=14)
-            plt.legend(title='Matrix Size', fontsize=12, loc='center left', bbox_to_anchor=(1, 0.5))
-            plt.grid(True)
-            plt.tight_layout()
-
-            plt.savefig(f'images/{method}_large_matrix_cpu_utilization.png', bbox_inches='tight')
-            print(f"Created CPU utilization graph for {method} method with large matrices (saved as {method}_large_matrix_cpu_utilization.png)")
+        plt.savefig(f'images/matrix_cpu_utilization.png', bbox_inches='tight')
+        print(f"Created CPU utilization graph comparing all methods with small matrices")
 
     plt.close('all')
 
@@ -264,7 +231,7 @@ def generate_additional_plots(df, summary_df, matrix, key):
         )
 
         plt.figure(figsize=(14, 6))
-        sns.heatmap(heatmap_data, annot=True, fmt='.2f', cmap='viridis', cbar_kws={'label': 'Time (seconds)'})
+        sns.heatmap(heatmap_data, annot=True, fmt='.5f', cmap='viridis', cbar_kws={'label': 'Time (seconds)'})
         plt.title(f'Mean Execution Time Heatmap for Matrix Size {size}', fontsize=16)
         plt.xlabel('Number of Cores', fontsize=14)
         plt.ylabel('Method', fontsize=14)
@@ -294,13 +261,13 @@ def generate_perf_plots():
     # Generate cpu utilization plots
     generate_cpu_utilization_plots(df)
 
-    generate_additional_plots(df, summary_df, [8192], "large")
+    generate_additional_plots(df, summary_df, [4096, 5000], "large")
 
 def main():
     """Main function to execute the benchmark tests."""
     # Parameters
-    matrix_sizes = [8192]
-    core_counts = [16, 32, 40, 48, 64, 96]
+    matrix_sizes = [4096, 5000]
+    core_counts = [16, 32, 48, 64]
     runs_per_test = 10
 
     # Run tests and collect results

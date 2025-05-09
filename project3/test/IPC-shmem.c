@@ -3,12 +3,15 @@
  * Feel free to extend or change any code or functions below.
  *
  * use following command to get approx performance stats:
- * make && /usr/bin/time -f "%e,%U,%S" -q ./shmem -p
+ * make && /usr/bin/time -f "%e,%U,%S" -q ./shmem_1.o -p
+ * make && /usr/bin/time -f "%e,%U,%S" -q ./shmem_2.o -p
+ * make && /usr/bin/time -f "%e,%U,%S" -q ./shmem_3.o -p
  *
  * Please make sure to run the following commands to make the program work!
  * echo "#kernel shmmni increased for shmem implementation" | sudo tee -a /etc/sysctl.conf
  * echo "kernel.shmmni=16384" | sudo tee -a /etc/sysctl.conf
  * tail -n 2 /etc/sysctl.conf
+ * sudo sysctl -p
  */
 #define _GNU_SOURCE
 #include <err.h>
@@ -35,12 +38,12 @@
 #endif
 
 //Add all your global variables and definitions here.
-#define MATRIX_SIZE 10000
+#define MATRIX_SIZE 4096
 // floating point precision issues if value exceeds certain thresholds
 #define MAX_VALUE (MATRIX_SIZE < 1024 ? 2048 : \
 				 (MATRIX_SIZE < 4096 ? 1024 : \
 				 (MATRIX_SIZE <= 8192 ? 512 : 4)))
-#define MAX_CORES 16
+#define MAX_CORES 96
 #define MAX_ALLOWED_CORES 16
 #define IS_VALIDATE_MATRIX 0
 #define VALIDATE_MAX_SIZE 10000
