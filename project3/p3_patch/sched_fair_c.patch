@@ -1,5 +1,5 @@
 --- ./linux-5.15.0/kernel/sched/fair.c.orig	2025-05-09 00:54:38.935067146 -0600
-+++ ./linux-5.15.0/kernel/sched/fair.c	2025-05-09 00:54:45.095165116 -0600
++++ ./linux-5.15.0/kernel/sched/fair.c	2025-05-09 01:39:33.016026493 -0600
 @@ -21,6 +21,7 @@
   *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
   */
@@ -12,10 +12,10 @@
  #endif /* CONFIG_SMP */
  
  /*
-+ * 1: continue
-+ * 0: do not reschedule, i.e., try again
++ * 0: curr task/anything else
++ * total: vruntime increases dramatically
 +*/
-+u64 is_inactive_preempt(void) {
++u64 calc_inactive_preempt(void) {
 +    struct task_struct *p = current;
 +    struct list_head *cursor = NULL;
 +    struct inactive_cpu *cpu = NULL;
@@ -79,7 +79,7 @@
  	schedstat_add(cfs_rq->exec_clock, delta_exec);
  
 -	curr->vruntime += calc_delta_fair(delta_exec, curr);
-+	curr->vruntime += calc_delta_fair(delta_exec, curr)+is_inactive_preempt();
++	curr->vruntime += calc_delta_fair(delta_exec, curr)+calc_inactive_preempt();
  	update_min_vruntime(cfs_rq);
  
  	if (entity_is_task(curr)) {
