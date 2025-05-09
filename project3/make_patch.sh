@@ -14,7 +14,7 @@ do
     echo "Added patch file: ${oF}"
 done
 
-patch_dirs=(kernel/sched/my_inactive.h)
+patch_dirs=(include/linux/my_inactive.h)
 out_dirs=(my_inactive_h.patch)
 for i in ${!patch_dirs[@]}
 do

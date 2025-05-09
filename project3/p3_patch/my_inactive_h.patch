@@ -1,6 +1,6 @@
---- /dev/null	2025-05-08 14:11:19.045437220 -0600
-+++ ./linux-5.15.0/kernel/sched/my_inactive.h	2025-05-08 13:54:35.627263039 -0600
-@@ -0,0 +1,38 @@
+--- /dev/null	2025-05-08 17:04:45.961019698 -0600
++++ ./linux-5.15.0/include/linux/my_inactive.h	2025-05-08 18:51:10.456519790 -0600
+@@ -0,0 +1,39 @@
 +#ifndef _LINUX_MY_SLEEP_H
 +#define _LINUX_MY_SLEEP_H
 +
@@ -27,7 +27,6 @@
 +
 +struct inactive_tasks {
 +    pid_t pid;
-+    u64 run_time;
 +    u64 inactive_time;
 +    struct list_head head;
 +};
@@ -37,5 +36,7 @@
 +    raw_spinlock_t lock;
 +    struct list_head proc_list;
 +};
++
++DECLARE_PER_CPU(struct inactive_cpu, ia_cpu_queue);
 +
 +#endif //_LINUX_MY_SLEEP_H
